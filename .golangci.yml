@@ -17,6 +17,12 @@ linters:
     - gomodguard        # Deprecated
     - noinlineerr       # Forces to not use inline error handling
   settings:
+    dupword:
+      # The order_by syntax legitimately repeats this keyword: "desc desc"
+      # orders a field named desc descending. The auto-fix would otherwise
+      # rewrite test inputs and doc comments.
+      ignore:
+        - desc
     goconst:
       ignore-tests: true
     exhaustive:
