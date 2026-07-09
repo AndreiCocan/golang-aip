@@ -1,0 +1,79 @@
+syntax = "proto3";
+
+package testproto;
+
+import "google/api/field_behavior.proto";
+
+option go_package = "github.com/AndreiCocan/golang-aip/internal/testproto";
+
+// Book is the test resource for the fieldbehavior and fieldmask packages.
+// Its fields cover every field behavior and shape the packages care about:
+// identifier, required, output-only, input-only, immutable, nested message,
+// map, and repeated fields.
+message Book {
+  // The resource name of the book.
+  string name = 1 [(google.api.field_behavior) = IDENTIFIER];
+
+  // The title of the book.
+  string title = 2 [(google.api.field_behavior) = REQUIRED];
+
+  // The author of the book.
+  Author author = 3 [(google.api.field_behavior) = OPTIONAL];
+
+  // The ISBN assigned when the book is first registered.
+  string isbn = 4 [(google.api.field_behavior) = IMMUTABLE];
+
+  // When the book was created.
+  string create_time = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // Import credentials, accepted on input and never returned.
+  string import_token = 6 [(google.api.field_behavior) = INPUT_ONLY];
+
+  // Free-form labels.
+  map<string, string> labels = 7 [(google.api.field_behavior) = OPTIONAL];
+
+  // Shelves the book appears on.
+  repeated string shelves = 8 [(google.api.field_behavior) = OPTIONAL];
+
+  // Reviews of the book, keyed by reviewer.
+  map<string, Review> reviews = 9 [(google.api.field_behavior) = OPTIONAL];
+
+  // Number of pages.
+  int32 page_count = 10 [(google.api.field_behavior) = OPTIONAL];
+
+  // Edition names keyed by edition number.
+  map<int32, string> editions = 11 [(google.api.field_behavior) = OPTIONAL];
+
+  // Reviews shown on the book's landing page.
+  repeated Review featured_reviews = 12 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// Author of a book.
+message Author {
+  // The author's display name.
+  string name = 1 [(google.api.field_behavior) = REQUIRED];
+
+  // The author's age.
+  int32 age = 2 [(google.api.field_behavior) = OPTIONAL];
+
+  // Whether the author's identity is verified.
+  bool verified = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Review of a book.
+message Review {
+  // The review text.
+  string text = 1 [(google.api.field_behavior) = REQUIRED];
+
+  // The star rating, 1 to 5.
+  int32 rating = 2 [(google.api.field_behavior) = OPTIONAL];
+}
+
+// CreateBookRequest exercises request-level required fields.
+message CreateBookRequest {
+  // The parent shelf.
+  string parent = 1 [(google.api.field_behavior) = REQUIRED];
+
+  // The book to create.
+  Book book = 2 [(google.api.field_behavior) = REQUIRED];
+}
