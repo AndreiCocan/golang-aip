@@ -87,8 +87,10 @@ func (o Operator) String() string {
 }
 
 // Comparison relates a field or function call to a typed literal, such as
-// `create_time > <timestamp>`. Bare boolean restrictions are normalized to
-// comparisons: the filter `published` checks to `published = true`.
+// `create_time > <timestamp>`. A bare call to a function that returns bool
+// is normalized to a comparison: the filter `overdue()` checks to
+// `overdue() = true`. A bare field name is not: the filter `published` is a
+// [Search] for the word, and `published = true` tests the field.
 type Comparison struct {
 	Left  Operand
 	Op    Operator
