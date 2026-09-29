@@ -28,7 +28,8 @@ func TestWalk(t *testing.T) {
 	t.Parallel()
 
 	checked, err := filtering.Compile(
-		`published = true AND (rating > 4.0 OR NOT state = DELETED) war`, checkSchema)
+		`published = true AND (rating > 4.0 OR NOT state = DELETED) war`, checkSchema,
+	)
 	if err != nil {
 		t.Fatalf("Compile() error = %v", err)
 	}

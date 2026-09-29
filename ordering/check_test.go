@@ -205,8 +205,7 @@ func TestCompile(t *testing.T) {
 
 		_, err := ordering.Compile("title asc", bookSchema)
 
-		var parseErr *ordering.ParseError
-		if !errors.As(err, &parseErr) {
+		if _, ok := errors.AsType[*ordering.ParseError](err); !ok {
 			t.Fatalf("Compile() error is %T, want *ParseError", err)
 		}
 	})
@@ -216,8 +215,7 @@ func TestCompile(t *testing.T) {
 
 		_, err := ordering.Compile("nope", bookSchema)
 
-		var checkErr *ordering.CheckError
-		if !errors.As(err, &checkErr) {
+		if _, ok := errors.AsType[*ordering.CheckError](err); !ok {
 			t.Fatalf("Compile() error is %T, want *CheckError", err)
 		}
 	})
