@@ -3,6 +3,7 @@ linters:
   default: all
   disable:
     - exhaustruct       # Requires every struct field to be initialized
+    - exhaustruct_v5    # Replaces exhaustruct since golangci-lint v2.13
     - wsl               # Whitespace/style only
     - varnamelen        # Often too opinionated
     - depguard          # Only useful if you restrict imports
@@ -58,7 +59,8 @@ formatters:
       custom-order: true
     gofumpt:
       module-path: github.com/AndreiCocan/golang-aip
-      extra-rules: true
+      extra:
+        group-params: true
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0

@@ -1,5 +1,5 @@
 # Pinned tool versions.
-GOLANGCI_LINT_VERSION := v2.12.2
+GOLANGCI_LINT_VERSION := v2.13.2
 PROTOC_GEN_GO_VERSION := v1.36.11
 
 GOBIN := $(shell go env GOPATH)/bin

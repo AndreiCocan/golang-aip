@@ -15,8 +15,7 @@ func ExampleCompile() {
 	)
 
 	checked, err := filtering.Compile(
-		`display_name = "war*" AND create_time > "2021-02-14T10:00:00Z"`, schema,
-	)
+		`display_name = "war*" AND create_time > "2021-02-14T10:00:00Z"`, schema)
 	if err != nil {
 		fmt.Println(err)
 
