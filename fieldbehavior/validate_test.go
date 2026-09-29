@@ -2,6 +2,8 @@ package fieldbehavior_test
 
 import (
 	"errors"
+	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -213,6 +215,76 @@ func TestValidateRequiredWithMask(t *testing.T) {
 			t.Fatalf("error %q reports a subfield of the missing message", err)
 		}
 	})
+}
+
+func TestRequiredFieldsErrorPaths(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		err  error
+		want []string
+	}{
+		{
+			name: "every missing field of a request",
+			err:  fieldbehavior.ValidateRequired(new(testproto.CreateBookRequest)),
+			want: []string{"parent", "book"},
+		},
+		{
+			name: "nested missing field",
+			err: fieldbehavior.ValidateRequired(&testproto.CreateBookRequest{
+				Parent: "shelves/1",
+				Book:   new(testproto.Book),
+			}),
+			want: []string{"book.title"},
+		},
+		{
+			name: "mask paths",
+			err: fieldbehavior.ValidateRequiredWithMask(
+				new(testproto.CreateBookRequest),
+				&fieldmaskpb.FieldMask{Paths: []string{"parent", "book"}},
+			),
+			want: []string{"book", "parent"},
+		},
+		{
+			name: "wrapped error",
+			err: fmt.Errorf("create book: %w",
+				fieldbehavior.ValidateRequired(new(testproto.CreateBookRequest))),
+			want: []string{"parent", "book"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			rf, ok := errors.AsType[*fieldbehavior.RequiredFieldsError](tt.err)
+			if !ok {
+				t.Fatalf("error %v is not a *RequiredFieldsError", tt.err)
+			}
+
+			// The mask variant gives no stable order.
+			got := slices.Sorted(slices.Values(rf.Paths))
+			if want := slices.Sorted(slices.Values(tt.want)); !slices.Equal(got, want) {
+				t.Fatalf("Paths = %q, want %q", rf.Paths, tt.want)
+			}
+		})
+	}
+}
+
+func TestRequiredFieldsError(t *testing.T) {
+	t.Parallel()
+
+	err := &fieldbehavior.RequiredFieldsError{Paths: []string{"parent", "book.title"}}
+
+	if !errors.Is(err, fieldbehavior.ErrMissingRequired) {
+		t.Errorf("errors.Is(%v, ErrMissingRequired) = false, want true", err)
+	}
+
+	want := "missing required field: parent\nmissing required field: book.title"
+	if err.Error() != want {
+		t.Errorf("Error() = %q, want %q", err.Error(), want)
+	}
 }
 
 // assertMissing checks that err reports the given missing required field

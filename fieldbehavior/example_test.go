@@ -1,6 +1,7 @@
 package fieldbehavior_test
 
 import (
+	"errors"
 	"fmt"
 
 	"google.golang.org/genproto/googleapis/api/annotations"
@@ -34,4 +35,15 @@ func ExampleValidateRequired() {
 	err := fieldbehavior.ValidateRequired(req)
 	fmt.Println(err)
 	// Output: missing required field: book.title
+}
+
+// A create handler lists every missing field, for example as one field
+// violation per field in an INVALID_ARGUMENT response.
+func ExampleRequiredFieldsError() {
+	err := fieldbehavior.ValidateRequired(new(testproto.CreateBookRequest))
+
+	if rf, ok := errors.AsType[*fieldbehavior.RequiredFieldsError](err); ok {
+		fmt.Println(rf.Paths)
+	}
+	// Output: [parent book]
 }

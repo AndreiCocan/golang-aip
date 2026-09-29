@@ -26,7 +26,8 @@
 //
 // Validation errors match [ErrMissingRequired] with [errors.Is] and name
 // every missing field; services should surface them as an INVALID_ARGUMENT
-// response.
+// response. The error is a [*RequiredFieldsError] with the paths of all the
+// missing fields, for example to build one field violation per field.
 //
 // A nil message is a programming error everywhere a descriptor is needed to
 // do the work: [Copy], [ValidateRequired], and [ValidateRequiredWithMask]

@@ -1,8 +1,6 @@
 package fieldbehavior
 
 import (
-	"errors"
-	"fmt"
 	"strings"
 
 	"google.golang.org/genproto/googleapis/api/annotations"
@@ -11,9 +9,10 @@ import (
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 )
 
-// ValidateRequired returns an error matching [ErrMissingRequired] for every
-// required field of the message that is not populated, joined into one
-// error. A required field is populated when it has a value: non-zero for
+// ValidateRequired returns a [*RequiredFieldsError], which matches
+// [ErrMissingRequired], with the path of every required field of the message
+// that is not populated. It returns nil when all required fields are
+// populated. A required field is populated when it has a value: non-zero for
 // scalars without explicit presence, present for messages, non-empty for
 // repeated fields and maps. Nested messages are validated wherever they are
 // populated, including inside repeated fields and map values.
@@ -22,7 +21,7 @@ import (
 // provided; for update requests use [ValidateRequiredWithMask]. Passing a
 // nil message panics, since there is no descriptor to validate against.
 func ValidateRequired(msg proto.Message) error {
-	return missingRequired(msg.ProtoReflect(), "")
+	return newRequiredFieldsError(missingRequired(msg.ProtoReflect(), ""))
 }
 
 // ValidateRequiredWithMask is [ValidateRequired] restricted to the fields
@@ -43,15 +42,15 @@ func ValidateRequiredWithMask(msg proto.Message, mask *fieldmaskpb.FieldMask) er
 	m := msg.ProtoReflect()
 
 	if len(mask.GetPaths()) == 0 {
-		var errs []error
+		var missing []string
 
 		m.Range(func(fd protoreflect.FieldDescriptor, _ protoreflect.Value) bool {
-			errs = append(errs, missingInField(m, fd, string(fd.Name())))
+			missing = append(missing, missingInField(m, fd, string(fd.Name()))...)
 
 			return true
 		})
 
-		return errors.Join(errs...)
+		return newRequiredFieldsError(missing)
 	}
 
 	root := &maskNode{children: map[string]*maskNode{}}
@@ -59,7 +58,17 @@ func ValidateRequiredWithMask(msg proto.Message, mask *fieldmaskpb.FieldMask) er
 		root.insert(strings.Split(path, "."))
 	}
 
-	return missingInCovered(m, root, "")
+	return newRequiredFieldsError(missingInCovered(m, root, ""))
+}
+
+// newRequiredFieldsError returns a [*RequiredFieldsError] with the missing
+// paths, or nil when there are none.
+func newRequiredFieldsError(missing []string) error {
+	if len(missing) == 0 {
+		return nil
+	}
+
+	return &RequiredFieldsError{Paths: missing}
 }
 
 // maskNode is one segment of a field mask path tree. A terminal node covers
@@ -85,37 +94,39 @@ func (n *maskNode) insert(segments []string) {
 	child.insert(segments[1:])
 }
 
-// missingRequired checks every field of the message, at any depth.
-func missingRequired(m protoreflect.Message, prefix string) error {
+// missingRequired returns the paths of the missing required fields of the
+// message, at any depth.
+func missingRequired(m protoreflect.Message, prefix string) []string {
 	fields := m.Descriptor().Fields()
 
-	errs := make([]error, 0, fields.Len())
+	missing := make([]string, 0, fields.Len())
 	for i := range fields.Len() {
 		fd := fields.Get(i)
-		errs = append(errs, missingInField(m, fd, joinPath(prefix, string(fd.Name()))))
+		missing = append(missing, missingInField(m, fd, joinPath(prefix, string(fd.Name())))...)
 	}
 
-	return errors.Join(errs...)
+	return missing
 }
 
-// missingInField checks one field and, when it is populated, every nested
-// message below it.
-func missingInField(m protoreflect.Message, fd protoreflect.FieldDescriptor, path string) error {
+// missingInField returns the path of one field when it is required and missing,
+// or, when it is populated, the missing paths of every nested message below
+// it.
+func missingInField(m protoreflect.Message, fd protoreflect.FieldDescriptor, path string) []string {
 	if !m.Has(fd) {
 		if Has(fd, annotations.FieldBehavior_REQUIRED) {
-			return fmt.Errorf("%w: %s", ErrMissingRequired, path)
+			return []string{path}
 		}
 
 		return nil
 	}
 
-	var errs []error
+	var missing []string
 
 	rangeNested(fd, m.Get(fd), path, func(nested protoreflect.Message, nestedPath string) {
-		errs = append(errs, missingRequired(nested, nestedPath))
+		missing = append(missing, missingRequired(nested, nestedPath)...)
 	})
 
-	return errors.Join(errs...)
+	return missing
 }
 
 // missingInCoveredField checks a field that a terminal mask path covers. Beyond
@@ -127,9 +138,9 @@ func missingInCoveredField(
 	m protoreflect.Message,
 	fd protoreflect.FieldDescriptor,
 	path string,
-) error {
-	if err := missingInField(m, fd, path); err != nil {
-		return err
+) []string {
+	if missing := missingInField(m, fd, path); len(missing) > 0 {
+		return missing
 	}
 
 	// A populated field was already walked by checkField, and only singular
@@ -141,13 +152,14 @@ func missingInCoveredField(
 	return missingRequired(m.Get(fd).Message(), path)
 }
 
-// missingInCovered checks the fields of m that the mask tree covers.
-func missingInCovered(m protoreflect.Message, node *maskNode, prefix string) error {
-	var errs []error
+// missingInCovered returns the missing required paths among the fields of m
+// that the mask tree covers.
+func missingInCovered(m protoreflect.Message, node *maskNode, prefix string) []string {
+	var missing []string
 
 	for segment, child := range node.children {
 		if segment == "*" {
-			errs = append(errs, missingRequired(m, prefix))
+			missing = append(missing, missingRequired(m, prefix)...)
 
 			continue
 		}
@@ -159,35 +171,35 @@ func missingInCovered(m protoreflect.Message, node *maskNode, prefix string) err
 
 		path := joinPath(prefix, segment)
 		if child.terminal {
-			errs = append(errs, missingInCoveredField(m, fd, path))
+			missing = append(missing, missingInCoveredField(m, fd, path)...)
 
 			continue
 		}
 
 		switch {
 		case fd.IsMap():
-			errs = append(errs, missingInCoveredMapKeys(m, fd, child, path))
+			missing = append(missing, missingInCoveredMapKeys(m, fd, child, path)...)
 		case fd.IsList():
 			// No coverage below repeated fields: masks cannot traverse them.
 		case fd.Kind() == protoreflect.MessageKind:
 			// Get on an unpopulated field yields an empty message, so
 			// covered required subfields of an unset parent still report
 			// as missing.
-			errs = append(errs, missingInCovered(m.Get(fd).Message(), child, path))
+			missing = append(missing, missingInCovered(m.Get(fd).Message(), child, path)...)
 		}
 	}
 
-	return errors.Join(errs...)
+	return missing
 }
 
-// missingInCoveredMapKeys checks the entries of a string-keyed map of
-// messages that the mask tree names.
+// missingInCoveredMapKeys returns the missing required paths among the
+// entries of a string-keyed map of messages that the mask tree names.
 func missingInCoveredMapKeys(
 	m protoreflect.Message,
 	fd protoreflect.FieldDescriptor,
 	node *maskNode,
 	path string,
-) error {
+) []string {
 	if fd.MapKey().Kind() != protoreflect.StringKind ||
 		fd.MapValue().Kind() != protoreflect.MessageKind {
 		return nil
@@ -195,7 +207,7 @@ func missingInCoveredMapKeys(
 
 	mp := m.Get(fd).Map()
 
-	var errs []error
+	var missing []string
 
 	for key, child := range node.children {
 		mk := protoreflect.ValueOfString(key).MapKey()
@@ -205,15 +217,15 @@ func missingInCoveredMapKeys(
 
 		keyPath := path + "." + key
 		if child.terminal {
-			errs = append(errs, missingRequired(mp.Get(mk).Message(), keyPath))
+			missing = append(missing, missingRequired(mp.Get(mk).Message(), keyPath)...)
 
 			continue
 		}
 
-		errs = append(errs, missingInCovered(mp.Get(mk).Message(), child, keyPath))
+		missing = append(missing, missingInCovered(mp.Get(mk).Message(), child, keyPath)...)
 	}
 
-	return errors.Join(errs...)
+	return missing
 }
 
 // joinPath joins a parent path and a segment with a dot, omitting the dot
