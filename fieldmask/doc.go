@@ -23,6 +23,10 @@
 // or index into their elements. The "*" path, alone, selects the entire
 // resource: full replacement in an update, all fields in a read.
 //
+// Paths use the proto names of the fields. [Normalize] converts a mask
+// that uses the JSON names, such as "createTime", which REST clients tend
+// to write.
+//
 // An omitted mask means different defaults on the two sides: an update
 // falls back to the implied mask of the payload's populated fields, while
 // a read returns the full resource.

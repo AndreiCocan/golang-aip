@@ -18,6 +18,16 @@ type pathSegment struct {
 	quoted bool
 }
 
+// String returns the segment as it appears in a path, in backticks when it
+// is quoted.
+func (s pathSegment) String() string {
+	if s.quoted {
+		return "`" + s.value + "`"
+	}
+
+	return s.value
+}
+
 // splitPath splits a field mask path into its dot-separated segments. A
 // segment may be backtick-quoted to carry problematic characters, dots
 // included: "labels.`k8s.io/name`" has the two segments "labels" and

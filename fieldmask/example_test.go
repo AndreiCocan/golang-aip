@@ -37,6 +37,22 @@ func ExampleUpdate() {
 	// 2026-01-01T00:00:00Z
 }
 
+// A REST client can write the mask with the JSON names of the fields.
+// Normalize converts them to the proto names that Prune and Update expect.
+func ExampleNormalize() {
+	mask := &fieldmaskpb.FieldMask{Paths: []string{"createTime", "labels.myKey"}}
+
+	normalized, err := fieldmask.Normalize(mask, &testproto.Book{})
+	if err != nil {
+		fmt.Println(err)
+
+		return
+	}
+
+	fmt.Println(normalized.GetPaths())
+	// Output: [create_time labels.myKey]
+}
+
 // A get handler strips the response down to the fields the read mask
 // names.
 func ExamplePrune() {
