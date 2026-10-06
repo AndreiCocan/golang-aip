@@ -1,7 +1,6 @@
 package filtering
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 )
@@ -43,60 +42,47 @@ func NewSchema(decls ...Decl) *Schema {
 // [Comparison] nodes. Map keys may be traversed like fields; repeated
 // fields may be crossed.
 func (s *Schema) Field(path string) (*Field, error) {
-	field := &Field{}
-	rest := path
-	fields := s.fields
+	names := strings.Split(path, ".")
 
-	var typ Type
+	t, ok := s.fields[names[0]]
+	if !ok {
+		return nil, fmt.Errorf("unknown field %q in %q", names[0], path)
+	}
 
-	for first := true; rest != ""; first = false {
-		name, tail, _ := strings.Cut(rest, ".")
-		rest = tail
+	field := &Field{Segments: make([]FieldSegment, 0, len(names))}
+	field.Segments = append(field.Segments, FieldSegment{Name: names[0], Type: t})
 
-		if !first {
-			var ok bool
-
-			fields, ok = subfields(typ)
-			if !ok {
-				return nil, fmt.Errorf("field %q of %q is not a message", name, path)
-			}
-		}
-
-		var ok bool
-
-		typ, ok = fields[name]
-		if !ok && fields != nil {
+	for _, name := range names[1:] {
+		if t, ok = subfieldType(t, name); !ok {
 			return nil, fmt.Errorf("unknown field %q in %q", name, path)
 		}
 
-		if fields == nil {
-			// Inside a map: any name is a key of the map's value type.
-			typ = *field.Segments[len(field.Segments)-1].Type.Elem
-		}
-
-		field.Segments = append(field.Segments, FieldSegment{Name: name, Type: typ})
-	}
-
-	if len(field.Segments) == 0 {
-		return nil, errors.New("empty field path")
+		field.Segments = append(field.Segments, FieldSegment{Name: name, Type: t})
 	}
 
 	return field, nil
 }
 
-// subfields returns the field set to resolve the next path segment in: the
-// subfields of a message, or nil for a map, whose keys are unrestricted.
-// The second result reports whether the type can be traversed at all.
-func subfields(t Type) (map[string]Type, bool) {
+// subfieldType returns the type of the path segment name below a field of type t:
+// a subfield of a message, the value of any key of a map, or a subfield of
+// the message elements of a repeated field. It reports false when t has no
+// such segment.
+func subfieldType(t Type, name string) (Type, bool) {
 	switch t.Kind {
 	case KindMessage:
-		return t.msg.fields, true
+		sub, ok := t.msg.fields[name]
+
+		return sub, ok
 	case KindMap:
-		return nil, true
+		return *t.Elem, true
 	case KindRepeated:
-		return subfields(*t.Elem)
+		if t.Elem.Kind != KindMessage {
+			return Type{}, false
+		}
+
+		return subfieldType(*t.Elem, name)
 	default:
-		return nil, false
+		return Type{}, false
 	}
 }
 

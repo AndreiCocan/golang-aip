@@ -241,15 +241,8 @@ func (c *checker) resolveField(m *ast.Member, has bool) (*Field, error) {
 
 	for _, sv := range m.Fields {
 		switch t.Kind {
-		case KindMessage:
-			sub, ok := t.msg.fields[sv.Text]
-			if !ok {
-				return nil, c.errorf(sv.Pos(), "unknown field %q in %q", sv.Text, field.Path())
-			}
-
-			t = sub
-		case KindMap:
-			t = *t.Elem
+		case KindMessage, KindMap:
+			// Any subfield or key; child checks that it exists.
 		case KindRepeated:
 			if !has {
 				return nil, c.errorf(
@@ -269,22 +262,14 @@ func (c *checker) resolveField(m *ast.Member, has bool) (*Field, error) {
 
 			crossedRepeated = true
 
-			elem := *t.Elem
-			if elem.Kind != KindMessage {
+			if t.Elem.Kind != KindMessage {
 				return nil, c.errorf(
 					sv.Pos(),
 					"repeated field %q has %v elements, not messages",
 					field.Path(),
-					elem.Kind,
+					t.Elem.Kind,
 				)
 			}
-
-			sub, ok := elem.msg.fields[sv.Text]
-			if !ok {
-				return nil, c.errorf(sv.Pos(), "unknown field %q in %q", sv.Text, field.Path())
-			}
-
-			t = sub
 		default:
 			return nil, c.errorf(
 				sv.Pos(),
@@ -294,6 +279,12 @@ func (c *checker) resolveField(m *ast.Member, has bool) (*Field, error) {
 			)
 		}
 
+		sub, ok := subfieldType(t, sv.Text)
+		if !ok {
+			return nil, c.errorf(sv.Pos(), "unknown field %q in %q", sv.Text, field.Path())
+		}
+
+		t = sub
 		field.Segments = append(field.Segments, FieldSegment{Name: sv.Text, Type: t})
 		prev = sv
 	}
