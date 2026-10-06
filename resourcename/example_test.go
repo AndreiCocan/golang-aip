@@ -6,6 +6,32 @@ import (
 	"github.com/AndreiCocan/golang-aip/resourcename"
 )
 
+// A get handler. Parse the name of the request into the IDs that the
+// database uses: a name that does not match the pattern is an
+// INVALID_ARGUMENT error. Build the names of the response with the same
+// pattern.
+func Example() {
+	const pattern = "publishers/{publisher}/books/{book}"
+
+	var publisher, book string
+	if err := resourcename.Sscan(
+		"publishers/123/books/les-miserables",
+		pattern,
+		&publisher,
+		&book,
+	); err != nil {
+		fmt.Println(err) // Return INVALID_ARGUMENT.
+
+		return
+	}
+
+	fmt.Println(publisher, book) // Read the row with these IDs.
+	fmt.Println(resourcename.Sprint(pattern, publisher, book))
+	// Output:
+	// 123 les-miserables
+	// publishers/123/books/les-miserables
+}
+
 func ExampleValidate() {
 	fmt.Println(resourcename.Validate("publishers/123/books/les-miserables"))
 	fmt.Println(resourcename.Validate("publishers/123/books/"))

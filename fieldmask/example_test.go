@@ -9,6 +9,45 @@ import (
 	"github.com/AndreiCocan/golang-aip/internal/testproto"
 )
 
+// An update handler. Normalize the mask, in case a REST client wrote the
+// JSON names of the fields. Check it before the database read, to fail
+// fast on a bad path. Then merge the masked fields of the payload into the
+// stored resource, and store the result. Errors are INVALID_ARGUMENT.
+func Example() {
+	mask := &fieldmaskpb.FieldMask{Paths: []string{"title", "pageCount"}}
+	payload := &testproto.Book{Title: "The Go Programming Language, 2nd Edition", PageCount: 400}
+
+	mask, err := fieldmask.Normalize(mask, &testproto.Book{})
+	if err != nil {
+		fmt.Println(err)
+
+		return
+	}
+
+	if err := fieldmask.CheckUpdate(mask, &testproto.Book{}); err != nil {
+		fmt.Println(err)
+
+		return
+	}
+
+	stored := &testproto.Book{ // In a service: read it from the database.
+		Name:      "shelves/1/books/1",
+		Title:     "The Go Programming Language",
+		Isbn:      "978-0134190440",
+		PageCount: 380,
+	}
+
+	if err := fieldmask.Update(mask, stored, payload); err != nil {
+		fmt.Println(err)
+
+		return
+	}
+
+	// The fields outside the mask keep their stored values.
+	fmt.Println(stored.GetTitle(), stored.GetPageCount(), stored.GetIsbn())
+	// Output: The Go Programming Language, 2nd Edition 400 978-0134190440
+}
+
 // An update handler merges the masked fields of the request payload into
 // the stored resource. Server-managed fields survive even when the payload
 // tries to write them.
