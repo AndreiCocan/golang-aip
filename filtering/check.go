@@ -532,7 +532,7 @@ func (c *checker) callArgs(f *ast.Function, decl *declaredFunc) ([]FuncArg, []in
 
 		switch a := a.(type) {
 		case *ast.Member:
-			if field, err := c.resolveField(a, false); err == nil {
+			if field, ok := c.fieldArg(a); ok {
 				if field.Type().Kind != want {
 					return nil, nil, c.errorf(
 						a.Pos(),
@@ -582,6 +582,20 @@ func (c *checker) callArgs(f *ast.Function, decl *declaredFunc) ([]FuncArg, []in
 	}
 
 	return args, positions, nil
+}
+
+// fieldArg resolves the function argument m as a field path. It reports
+// false when m is not a field path, so that m is a literal. Most literals
+// do not start with a field name, and for them it skips resolveField and
+// the error that it builds.
+func (c *checker) fieldArg(m *ast.Member) (*Field, bool) {
+	if _, ok := c.schema.fields[m.Value.Text]; !ok {
+		return nil, false
+	}
+
+	field, err := c.resolveField(m, false)
+
+	return field, err == nil
 }
 
 // literal is the raw text of a comparison argument.
