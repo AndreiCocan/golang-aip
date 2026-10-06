@@ -23,8 +23,9 @@ type Decl interface {
 // NewSchema builds a schema from field and function declarations.
 //
 // Schemas are programmer input, so NewSchema panics instead of returning an
-// error: on a duplicate or empty name, an enum without values, or an
-// invalid function declaration.
+// error: on a duplicate or empty name, or an invalid function declaration.
+// The field constructors, such as [EnumField] and [MessageField], panic on their own
+// invalid input.
 func NewSchema(decls ...Decl) *Schema {
 	s := &Schema{
 		fields: make(map[string]Type),
@@ -139,7 +140,7 @@ func DurationField(name string) FieldDecl {
 }
 
 // EnumField declares a field restricted to the given case-sensitive value
-// names. NewSchema panics if no values are given.
+// names. EnumField panics if no values are given.
 func EnumField(name string, values ...string) FieldDecl {
 	if len(values) == 0 {
 		panic(fmt.Sprintf("filtering: enum field %q declared without values", name))
