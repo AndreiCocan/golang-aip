@@ -22,6 +22,9 @@
 //	)
 //	checked, err := ordering.Compile(req.GetOrderBy(), schema)
 //
+// [SchemaFromTags] builds the schema from the aip struct tags of a domain type
+// instead, such as ordering.SchemaFromTags(Book{}).
+//
 // A [CheckedOrderBy] order_by is a list of [Key] keys, each a dotted path with
 // a direction. An empty order_by is valid, yields no keys, and means the
 // service's default order.

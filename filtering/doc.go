@@ -23,6 +23,9 @@
 //	)
 //	checked, err := filtering.Compile(req.GetFilter(), schema)
 //
+// [SchemaFromTags] builds the schema from the aip struct tags of a domain type
+// instead, such as filtering.SchemaFromTags(Book{}).
+//
 // A [CheckedFilter] filter contains only five node kinds ([And], [Or], [Not],
 // [Comparison], and [Search]) with every literal resolved to a typed
 // [Value] and every field path resolved to a [Field] whose segments carry
