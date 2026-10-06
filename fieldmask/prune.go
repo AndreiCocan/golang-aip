@@ -8,14 +8,16 @@ import (
 
 // Prune clears every field of msg the mask does not cover, implementing the
 // read mask of a partial response. A covered field is kept whole; a path
-// into a message or map keeps only the named subfields or entries.
+// into a message or map keeps only the named subfields or entries, and a
+// path through a repeated message field keeps only the named subfields of
+// each element.
 //
 // A nil or empty mask, and the explicit "*" mask, mean the full resource:
-// Prune keeps everything. The mask is [CheckUpdate]-validated first, and on error
-// msg is left unmodified. Field behavior annotations play no role in
+// Prune keeps everything. The mask is [CheckRead]-validated first, and on
+// error msg is left unmodified. Field behavior annotations play no role in
 // reading, so output-only fields are as readable as any other.
 func Prune(mask *fieldmaskpb.FieldMask, msg proto.Message) error {
-	if err := CheckUpdate(mask, msg); err != nil {
+	if err := CheckRead(mask, msg); err != nil {
 		return err
 	}
 
@@ -48,6 +50,13 @@ func pruneTree(m protoreflect.Message, node *maskNode) {
 		switch {
 		case fd.IsMap():
 			pruneMapKeys(v.Map(), fd, child)
+		case fd.IsList():
+			// Below a repeated field the elements are messages; CheckRead
+			// has passed.
+			list := v.List()
+			for i := range list.Len() {
+				pruneTree(list.Get(i).Message(), child)
+			}
 		case fd.Kind() == protoreflect.MessageKind:
 			pruneTree(v.Message(), child)
 		}

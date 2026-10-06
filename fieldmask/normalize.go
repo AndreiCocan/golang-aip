@@ -23,8 +23,10 @@ import (
 // Normalize returns an empty mask for a nil mask. The two have the same
 // meaning in [CheckUpdate], [Prune], and [Update]. It returns an error that
 // matches [ErrInvalidFieldMask] when a path does not resolve against the
-// message type of msg, for the same causes as [CheckUpdate]. It does not detect a
-// "*" path together with other paths; [CheckUpdate] does.
+// message type of msg, for the same causes as [CheckRead]. Thus it accepts
+// a path through a repeated message field, such as "books.displayName",
+// which only a read mask allows; [CheckUpdate] rejects it. It does not detect a
+// "*" path together with other paths; [CheckUpdate] and [CheckRead] do.
 func Normalize(mask *fieldmaskpb.FieldMask, msg proto.Message) (*fieldmaskpb.FieldMask, error) {
 	md := msg.ProtoReflect().Descriptor()
 
@@ -63,7 +65,7 @@ func normalizePath(md protoreflect.MessageDescriptor, path string) (string, erro
 			segment.value = protoName(pos.message, segment.value)
 		}
 
-		pos, err = pos.step(segment)
+		pos, err = pos.step(segment, true)
 		if err != nil {
 			return "", err
 		}

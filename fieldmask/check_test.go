@@ -101,6 +101,73 @@ func TestCheckUpdate(t *testing.T) {
 	}
 }
 
+func TestCheckRead(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		paths   []string
+		wantErr string // substring of the error, "" means valid
+	}{
+		{name: "top-level scalar", paths: []string{"title"}},
+		{name: "whole repeated field", paths: []string{"featured_reviews"}},
+		{name: "field of each element", paths: []string{"featured_reviews.text"}},
+		{
+			name:  "fields of each element and other paths",
+			paths: []string{"featured_reviews.text", "featured_reviews.rating", "title"},
+		},
+		{name: "wildcard alone", paths: []string{"*"}},
+
+		{
+			name:    "unknown field of an element",
+			paths:   []string{"featured_reviews.nope"},
+			wantErr: `"nope"`,
+		},
+		{name: "index into repeated", paths: []string{"featured_reviews.0"}, wantErr: `"0"`},
+		{name: "through a repeated scalar", paths: []string{"shelves.name"}, wantErr: "repeated"},
+		{
+			name:    "traversal into a scalar of an element",
+			paths:   []string{"featured_reviews.text.x"},
+			wantErr: "subfields",
+		},
+		{name: "wildcard with other paths", paths: []string{"*", "title"}, wantErr: "wildcard"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := fieldmask.CheckRead(&fieldmaskpb.FieldMask{Paths: tt.paths}, &testproto.Book{})
+			if tt.wantErr == "" {
+				if err != nil {
+					t.Fatalf("CheckRead() = %v, want nil", err)
+				}
+
+				return
+			}
+
+			if !errors.Is(err, fieldmask.ErrInvalidFieldMask) {
+				t.Fatalf("CheckRead() = %v, want an error matching ErrInvalidFieldMask", err)
+			}
+
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("error %q does not contain %q", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestCheckUpdateRejectsPathsThroughRepeatedMessages(t *testing.T) {
+	t.Parallel()
+
+	err := fieldmask.CheckUpdate(
+		&fieldmaskpb.FieldMask{Paths: []string{"featured_reviews.text"}},
+		&testproto.Book{},
+	)
+	if !errors.Is(err, fieldmask.ErrInvalidFieldMask) {
+		t.Fatalf("CheckUpdate() = %v, want an error matching ErrInvalidFieldMask", err)
+	}
+}
+
 func TestIsWildcard(t *testing.T) {
 	t.Parallel()
 

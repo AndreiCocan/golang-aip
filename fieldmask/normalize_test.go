@@ -62,8 +62,13 @@ func TestNormalize(t *testing.T) {
 			wantErr: fieldmask.ErrInvalidFieldMask,
 		},
 		{
-			name:    "JSON name into a repeated field",
-			paths:   []string{"featuredReviews.text"},
+			name:  "JSON names through a repeated message field",
+			paths: []string{"featuredReviews.text"},
+			want:  []string{"featured_reviews.text"},
+		},
+		{
+			name:    "through a repeated scalar field",
+			paths:   []string{"shelves.name"},
 			wantErr: fieldmask.ErrInvalidFieldMask,
 		},
 		{name: "empty path", paths: []string{""}, wantErr: fieldmask.ErrInvalidFieldMask},

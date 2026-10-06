@@ -4,9 +4,10 @@
 //
 // [Update] merges the masked fields of a request payload into the stored
 // resource, [Prune] strips a response down to the masked fields, and
-// [CheckUpdate] validates a mask's paths on its own, for failing fast before the
-// resource is fetched. All three resolve paths against the message's own
-// proto descriptors, so there is no schema to declare.
+// [CheckUpdate] and [CheckRead] validate the paths of an update mask and of a read
+// mask on their own, for failing fast before the resource is fetched. All
+// of them resolve paths against the message's own proto descriptors, so
+// there is no schema to declare.
 //
 //	if err := fieldmask.Check(req.GetUpdateMask(), &pb.Book{}); err != nil { … }
 //	stored := fetch(…)
@@ -19,8 +20,10 @@
 // including backtick quoting for keys with problematic characters:
 // "labels.lang", "labels.`k8s.io/name`", "reviews.smith.rating". A quoted
 // key is a literal, so "labels.`*`" addresses the entry keyed "*". Repeated
-// fields and maps are otherwise selected as a whole; paths cannot traverse
-// or index into their elements. The "*" path, alone, selects the entire
+// fields and maps are otherwise selected as a whole; paths cannot index
+// into their elements. A read mask can go through a repeated message field
+// to name a field of each element, such as "books.title" in a list
+// response; an update mask cannot. The "*" path, alone, selects the entire
 // resource: full replacement in an update, all fields in a read.
 //
 // Paths use the proto names of the fields. [Normalize] converts a mask

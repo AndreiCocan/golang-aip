@@ -108,8 +108,10 @@ type pathPosition struct {
 	scalar   bool
 }
 
-// step advances the cursor by one path segment.
-func (pos pathPosition) step(segment pathSegment) (pathPosition, error) {
+// step advances the cursor by one path segment. throughRepeated tells
+// whether the segment after a repeated message field can name a field of
+// each element, which only a read mask allows.
+func (pos pathPosition) step(segment pathSegment, throughRepeated bool) (pathPosition, error) {
 	// Quoting makes "*" a literal map key rather than the wildcard.
 	if !segment.quoted && segment.value == WildcardPath {
 		return pathPosition{}, errors.New("the wildcard is only valid as the entire mask")
@@ -124,7 +126,7 @@ func (pos pathPosition) step(segment pathSegment) (pathPosition, error) {
 			return pathPosition{}, fmt.Errorf("unknown field %q", segment.value)
 		}
 
-		return positionAt(fd), nil
+		return positionAt(fd, throughRepeated), nil
 	case pos.repeated:
 		if _, err := strconv.Atoi(segment.value); err == nil {
 			return pathPosition{}, errors.New(
@@ -253,11 +255,16 @@ func (n *maskNode) insert(segments []string) {
 	child.insert(segments[1:])
 }
 
-// positionAt positions a cursor at the value of a field.
-func positionAt(fd protoreflect.FieldDescriptor) pathPosition {
+// positionAt positions a cursor at the value of a field. When
+// throughRepeated is true, the cursor of a repeated message field is at the
+// message type of its elements, so that the next segment names a field of
+// each element.
+func positionAt(fd protoreflect.FieldDescriptor, throughRepeated bool) pathPosition {
 	switch {
 	case fd.IsMap():
 		return pathPosition{mapField: fd}
+	case fd.IsList() && throughRepeated && fd.Kind() == protoreflect.MessageKind:
+		return pathPosition{message: fd.Message()}
 	case fd.IsList():
 		return pathPosition{repeated: true}
 	case fd.Kind() == protoreflect.MessageKind:
@@ -268,7 +275,9 @@ func positionAt(fd protoreflect.FieldDescriptor) pathPosition {
 }
 
 // checkPath resolves one non-wildcard path against a message type.
-func checkPath(md protoreflect.MessageDescriptor, path string) error {
+// throughRepeated tells whether the path can name the fields of the
+// elements of a repeated message field.
+func checkPath(md protoreflect.MessageDescriptor, path string, throughRepeated bool) error {
 	segments, err := splitPath(path)
 	if err != nil {
 		return err
@@ -276,7 +285,7 @@ func checkPath(md protoreflect.MessageDescriptor, path string) error {
 
 	pos := pathPosition{message: md}
 	for _, segment := range segments {
-		pos, err = pos.step(segment)
+		pos, err = pos.step(segment, throughRepeated)
 		if err != nil {
 			return err
 		}

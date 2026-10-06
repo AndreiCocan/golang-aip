@@ -137,3 +137,88 @@ func TestPrune(t *testing.T) {
 		})
 	}
 }
+
+func TestPruneThroughRepeatedMessages(t *testing.T) {
+	t.Parallel()
+
+	// reviewedBook returns a book with two featured reviews.
+	reviewedBook := func() *testproto.Book {
+		return &testproto.Book{
+			Title: "The Go Programming Language",
+			FeaturedReviews: []*testproto.Review{
+				{Text: "great", Rating: 5},
+				{Text: "good", Rating: 4},
+			},
+		}
+	}
+
+	tests := []struct {
+		name    string
+		paths   []string
+		want    *testproto.Book // ignored when wantErr is set
+		wantErr error
+	}{
+		{
+			name:  "field of each element",
+			paths: []string{"featured_reviews.text"},
+			want: &testproto.Book{FeaturedReviews: []*testproto.Review{
+				{Text: "great"},
+				{Text: "good"},
+			}},
+		},
+		{
+			name:  "fields of each element and a top-level field",
+			paths: []string{"title", "featured_reviews.rating", "featured_reviews.text"},
+			want:  reviewedBook(),
+		},
+		{
+			name:  "whole repeated field and a field of each element",
+			paths: []string{"featured_reviews", "featured_reviews.text"},
+			want:  &testproto.Book{FeaturedReviews: reviewedBook().GetFeaturedReviews()},
+		},
+		{
+			name:  "field that no element has",
+			paths: []string{"featured_reviews.rating", "title"},
+			want: &testproto.Book{
+				Title: "The Go Programming Language",
+				FeaturedReviews: []*testproto.Review{
+					{Rating: 5},
+					{Rating: 4},
+				},
+			},
+		},
+		{
+			name:    "index into an element is rejected",
+			paths:   []string{"featured_reviews.0"},
+			wantErr: fieldmask.ErrInvalidFieldMask,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			msg := reviewedBook()
+
+			err := fieldmask.Prune(&fieldmaskpb.FieldMask{Paths: tt.paths}, msg)
+			if tt.wantErr != nil {
+				if !errors.Is(err, tt.wantErr) {
+					t.Fatalf("Prune() = %v, want %v", err, tt.wantErr)
+				}
+
+				if diff := cmp.Diff(reviewedBook(), msg, protocmp.Transform()); diff != "" {
+					t.Fatalf("Prune() modified msg on error (-want +got):\n%s", diff)
+				}
+
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("Prune() = %v, want nil", err)
+			}
+
+			if diff := cmp.Diff(tt.want, msg, protocmp.Transform()); diff != "" {
+				t.Fatalf("Prune() mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
