@@ -16,9 +16,10 @@ import (
 // pattern, and every pointer must be non-nil.
 //
 // An error is returned when pattern is a full resource name, a variable
-// pointer is nil, a literal segment differs, name has fewer or more
-// segments than pattern, or the variable counts do not line up. On error,
-// some variables may already have been assigned.
+// pointer is nil, name contains a variable segment, a literal segment
+// differs, name has fewer or more segments than pattern, or the variable
+// counts do not line up. On error, some variables may already have been
+// assigned.
 func Sscan(name, pattern string, variables ...*string) (err error) {
 	defer func() {
 		if err != nil {
@@ -48,6 +49,14 @@ func Sscan(name, pattern string, variables ...*string) (err error) {
 		}
 
 		nameSegment, patternSegment := nameScanner.Segment(), patternScanner.Segment()
+		if nameSegment.IsVariable() {
+			return fmt.Errorf(
+				"segment %s: name has a variable segment %s",
+				patternSegment,
+				nameSegment,
+			)
+		}
+
 		if !patternSegment.IsVariable() {
 			// Compare raw segments: a braced name segment ("{books}") must
 			// not satisfy the literal "books".

@@ -55,6 +55,8 @@ func TestSscan(t *testing.T) {
 		numVariables int
 	}{
 		{"literal mismatch", "shelves/1", "publishers/{publisher}", 1},
+		{"variable in name", "publishers/{publisher}", "publishers/{publisher}", 1},
+		{"variable in name for literal", "{publishers}/1", "publishers/{publisher}", 1},
 		{"name too short", "publishers/1", "publishers/{publisher}/books/{book}", 2},
 		{"name too long", "publishers/1/books/2", "publishers/{publisher}", 1},
 		{"too few variables", "publishers/1/books/2", "publishers/{publisher}/books/{book}", 1},
