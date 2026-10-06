@@ -1,15 +1,8 @@
 package ordering
 
-// Compile parses orderBy and checks it against schema in one step. It is
-// the entry point for the common service path:
-//
-//	checked, err := ordering.Compile(req.GetOrderBy(), bookSchema)
-//	if errors.Is(err, ordering.ErrInvalidOrderBy) {
-//		return nil, status.Error(codes.InvalidArgument, err.Error())
-//	}
-//
-// Use [Parse] and [Check] separately when the syntactic tree is of
-// interest.
+// Compile parses orderBy and checks it against schema in one step. It
+// returns the errors of [Parse] and [Check]. Use Parse and Check
+// separately when you need the syntax tree.
 func Compile(orderBy string, schema *Schema) (*CheckedOrderBy, error) {
 	parsed, err := Parse(orderBy)
 	if err != nil {

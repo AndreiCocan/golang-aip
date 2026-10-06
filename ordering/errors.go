@@ -5,19 +5,14 @@ import (
 	"fmt"
 )
 
-// ErrInvalidOrderBy is the sentinel matched by every error returned for an
-// order_by that is syntactically malformed or fails schema checking.
-// Services should map errors matching this sentinel to an INVALID_ARGUMENT
-// response:
-//
-//	if errors.Is(err, ordering.ErrInvalidOrderBy) {
-//		return nil, status.Error(codes.InvalidArgument, err.Error())
-//	}
+// ErrInvalidOrderBy matches, with [errors.Is], every error that reports an
+// order_by with a syntax error or an order_by that does not match its
+// schema. Such an error is bad client input.
 var ErrInvalidOrderBy = errors.New("invalid order by")
 
 // ParseError reports a syntax error in an order_by. It matches
-// [ErrInvalidOrderBy] with [errors.Is] and carries the byte offset of the
-// offending token for precise user-facing messages.
+// [ErrInvalidOrderBy] with [errors.Is]. It holds the byte offset of the
+// token with the error, for precise messages to the user.
 type ParseError struct {
 	// OrderBy is the complete order_by being parsed.
 	OrderBy string
@@ -36,10 +31,10 @@ func (e *ParseError) Error() string {
 // Unwrap makes the error match [ErrInvalidOrderBy].
 func (e *ParseError) Unwrap() error { return ErrInvalidOrderBy }
 
-// CheckError reports an order_by that parsed but failed validation against
-// a [Schema]: an unknown field or a field ordered in two contradictory
-// directions. It matches [ErrInvalidOrderBy] with [errors.Is] and carries
-// the byte offset of the offending field.
+// CheckError reports an order_by that parsed but does not match its
+// [Schema]: an unknown field, or a field in two opposite directions. It
+// matches [ErrInvalidOrderBy] with [errors.Is]. It holds the byte offset
+// of the field with the error.
 type CheckError struct {
 	// OrderBy is the complete order_by being checked, when known.
 	OrderBy string

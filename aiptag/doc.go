@@ -8,9 +8,6 @@
 //   - order: an order_by can name the field.
 //   - search: a bare search term of a filter matches the field.
 //
-// The tag does not hold a resource name pattern.
-//
-// [Parse] reads the tag of one struct field. The filtering and ordering
-// packages of this module, and backend packages in other modules, use it so
-// that all of them read the same tag the same way.
+// [Parse] reads the tag of one struct field into a [Tag]. Use it in each
+// package that reads the tag, so that all of them read it the same way.
 package aiptag

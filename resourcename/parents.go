@@ -2,14 +2,15 @@ package resourcename
 
 import "iter"
 
-// HasAncestor reports whether name is strictly a descendant of parent: parent
-// must align segment-by-segment with a proper prefix of name. A name is
-// never its own parent. A [Wildcard] "-" segment in parent matches any
-// segment of name at that position.
+// HasAncestor reports whether ancestor is a strict ancestor of name, at any
+// depth: each segment of ancestor is equal to the segment of name at the
+// same position, and name has more segments. A name is not its own
+// ancestor. A [Wildcard] "-" segment in ancestor matches any segment of
+// name.
 //
-// The two names must agree on form: two relative names compare by path
-// only; two full names must share the same service host; a mix of one full
-// and one relative name is never a parent relationship.
+// The two names must have the same form. Two relative names compare by
+// their paths. Two full names must also have the same service name. A full
+// name and a relative name are never ancestor and descendant.
 func HasAncestor(name, ancestor string) bool {
 	if name == "" || ancestor == "" || name == ancestor {
 		return false
@@ -51,15 +52,15 @@ func HasAncestor(name, ancestor string) bool {
 	return true
 }
 
-// Ancestor returns the prefix of name that pattern covers when pattern
-// aligns with the start of name: literal pattern segments must be equal and
-// each "{variable}" accepts whatever appears in name at that position. The
-// returned string is a slice of name through the last segment that pattern
-// consumed, so for a full name it includes the "//host" prefix.
+// Ancestor returns the start of name that pattern matches. Each literal
+// segment of pattern must be equal to the segment of name at the same
+// position, and each "{variable}" segment matches any segment. The result is
+// a substring of name up to the last segment that pattern matched. For a
+// full name, it starts with the "//service" prefix.
 //
-// Returns "" and false when name or pattern is empty, when a literal
-// segment disagrees, when pattern is deeper than name, or when pattern
-// contains a [Wildcard] "-" (not supported in patterns).
+// Ancestor returns "" and false when name or pattern is empty, when a
+// literal segment is different, when pattern has more segments than name,
+// or when pattern has a [Wildcard] "-" segment.
 func Ancestor(name, pattern string) (string, bool) {
 	if name == "" || pattern == "" {
 		return "", false
@@ -87,12 +88,11 @@ func Ancestor(name, pattern string) (string, bool) {
 	return name[:nameScanner.End()], true
 }
 
-// Parents returns an iterator over every intermediate parent path of name,
-// from the shallowest ("publishers") to the deepest
-// ("publishers/1/books"). The name itself is never yielded. For a full
-// name, only path substrings after the service host are yielded.
+// Parents returns an iterator over the prefixes of name, from the shortest
+// ("publishers") to the longest ("publishers/1/books"). It does not yield
+// name. For a full name, the prefixes do not have the service name.
 //
-// Each yielded value is a slice of name and shares its storage.
+// Each yielded value is a substring of name, so it allocates no memory.
 func Parents(name string) iter.Seq[string] {
 	return func(yield func(string) bool) {
 		var sc Scanner

@@ -62,5 +62,6 @@ func DurationValue(d time.Duration) Value { return Value{Kind: KindDuration, Dur
 // NullValue returns the KindNull value, the literal null.
 func NullValue() Value { return Value{Kind: KindNull} }
 
-// PresenceValue returns the KindPresence value, the presence test *.
+// PresenceValue returns the KindPresence value: the bare * of a presence
+// test, such as `author:*`.
 func PresenceValue() Value { return Value{Kind: KindPresence} }

@@ -219,7 +219,7 @@ func TestParseToken(t *testing.T) {
 
 				// Truncation inside the payload is only detectable when
 				// the cursor is decoded, so corruption must surface as
-				// ErrInvalidPageToken from Parse or from Cursor.
+				// ErrInvalidPageToken from ParseToken or from Cursor.
 				parsed, err := pagination.ParseToken(tt.token)
 				if err == nil {
 					var dst bookCursor

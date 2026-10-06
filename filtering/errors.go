@@ -5,21 +5,16 @@ import (
 	"fmt"
 )
 
-// ErrInvalidFilter is the sentinel matched by every error returned for a
-// filter that is syntactically malformed or fails schema checking. Services
-// should map errors matching this sentinel to an INVALID_ARGUMENT response:
-//
-//	if errors.Is(err, filtering.ErrInvalidFilter) {
-//		return nil, status.Error(codes.InvalidArgument, err.Error())
-//	}
-//
-// Errors not matching ErrInvalidFilter indicate a bug in the calling
-// service, such as an invalid schema or a misbehaving function expander.
+// ErrInvalidFilter matches, with [errors.Is], every error that reports a
+// filter with a syntax error or a filter that does not match its schema.
+// Such an error is bad client input. An error that does not match
+// ErrInvalidFilter comes from an [Expander] of the service. Check returns
+// it without a change.
 var ErrInvalidFilter = errors.New("invalid filter")
 
 // ParseError reports a syntax error in a filter. It matches
-// [ErrInvalidFilter] with [errors.Is] and carries the byte offset of the
-// offending token for precise user-facing messages.
+// [ErrInvalidFilter] with [errors.Is]. It holds the byte offset of the
+// token with the error, for precise messages to the user.
 type ParseError struct {
 	// Filter is the complete filter being parsed.
 	Filter string
@@ -38,10 +33,10 @@ func (e *ParseError) Error() string {
 // Unwrap makes the error match [ErrInvalidFilter].
 func (e *ParseError) Unwrap() error { return ErrInvalidFilter }
 
-// CheckError reports a filter that parsed but failed validation against a
-// [Schema]: an unknown field, a type mismatch, or an unsupported operation.
-// It matches [ErrInvalidFilter] with [errors.Is] and carries the byte offset
-// of the offending token.
+// CheckError reports a filter that parsed but does not match its [Schema]:
+// an unknown field, a type mismatch, or an operation that the type does
+// not support. It matches [ErrInvalidFilter] with [errors.Is]. It holds
+// the byte offset of the token with the error.
 type CheckError struct {
 	// Filter is the complete filter being checked, when known.
 	Filter string

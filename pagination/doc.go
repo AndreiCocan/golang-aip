@@ -2,49 +2,39 @@
 // pagination, the page_size, page_token, and next_page_token fields of
 // List requests in resource-oriented APIs.
 //
-// The package is a token codec and a page-size policy; it issues no
-// queries. The service keeps a keyset cursor, a small struct holding the
-// ordering key of the last row it served, and pages by seeking past it.
-// [ParseToken] decodes a request's page_token into a [Token], [Token.Cursor]
-// recovers the cursor to seek from, and [Token.Next] mints the
-// next_page_token from the last row of the page being served. [ResolvePageSize]
-// resolves the request's page_size against the service's default and
-// maximum.
+// The package encodes tokens and applies a page size policy. It does not
+// send queries. A token holds a cursor: a value that the service makes,
+// such as the sort key of the last row of a page. The package has these
+// entry points:
 //
-//	token, err := pagination.Parse(req.GetPageToken(), req.GetFilter())
-//	size, err := pagination.PageSize(req.GetPageSize(), 25, 1000)
+//   - [ParseToken] decodes the page_token of a request into a [Token].
+//   - [Token.Cursor] decodes the cursor of the token.
+//   - [Token.Next] makes the next_page_token from a cursor.
+//   - [ResolvePageSize] applies the default and the maximum of the service
+//     to the page_size of a request.
 //
-//	var cur bookCursor
-//	ok, err := token.Cursor(&cur)
-//	// Seek past cur when ok. Fetch size+1 rows and serve size of them:
-//	// an extra row means another page exists, so mint its token from the
-//	// last row served; otherwise return "" as the next_page_token.
-//	next, err := token.Next(bookCursor{PublishTime: last.PublishTime, ID: last.ID})
+// The cursor can be any Go value that gob can encode. Its shape is private
+// to the service. A token is opaque to clients, and only the service that
+// made it decodes it. A token shows changes, but it is not encrypted, so a
+// cursor must not hold secrets. The checksums have no key. They find
+// accidents, not forgery. Thus a token must not give authority: the
+// service must authorize each request without the token.
 //
-// The cursor may be any gob-encodable Go value. Its shape is private to
-// the service: tokens are opaque to clients and only the service that
-// minted one decodes it. They are tamper-evident, not encrypted, so a
-// cursor must not carry secrets. The checksums are unkeyed and catch
-// accidents, not forgery, so a token must not carry authority either:
-// the service must authorize every request independently of its token.
+// AIP-158 requires a token to fail when a request argument that it uses
+// changes between pages. [ParseToken] keeps a checksum of its requestArgs
+// in the [Token], [Token.Next] writes it into the next token, and the next
+// ParseToken compares it with the checksum of its own requestArgs. Thus a
+// token that comes back with a different
+// parent, filter, or order_by fails with [ErrInvalidPageToken]. Do not
+// put page_size or skip in the arguments, because both can change between
+// pages. A change to the cursor type of the service also makes the old
+// tokens fail. For a change that the checksums cannot find, such as a new
+// meaning of an unchanged type, put a version constant in the arguments.
 //
-// AIP-158 requires a token to fail when request arguments it depends on
-// change between pages. The requestArgs passed to [ParseToken] are checksummed
-// into every token minted from it, so replaying a token under a different
-// parent, filter, or order_by fails with [ErrInvalidPageToken]. Leave
-// page_size out of the args, and skip too when the service implements
-// AIP-158 skip: both may change between pages. Changing the service's
-// cursor struct invalidates outstanding tokens the same way; to also
-// invalidate them on changes the checksums cannot see, such as reordering
-// an unchanged struct's meaning, include a version constant in the args.
-//
-// [ErrInvalidPageToken] and [ErrInvalidPageSize] report bad client input;
-// services should surface them as an INVALID_ARGUMENT response. Every
-// token failure, whether corruption, changed request arguments, or a
-// changed cursor shape, is deliberately the same bare
-// [ErrInvalidPageToken], because its message reaches clients; when all
-// outstanding tokens fail after a deploy, suspect a cursor or argument
-// change on the service side.
-// [ErrInvalidCursor] reports a bug in the service itself and should not
-// be mapped to a client error.
+// [ErrInvalidPageToken] and [ErrInvalidPageSize] report bad client input.
+// Each token failure gives the same [ErrInvalidPageToken], because its
+// message goes to the client: damage, changed request arguments, and a
+// changed cursor shape look the same. When all old tokens fail after a
+// deployment, look for a cursor or argument change in the service.
+// [ErrInvalidCursor] reports a bug in the service, not bad client input.
 package pagination

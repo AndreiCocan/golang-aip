@@ -7,19 +7,23 @@ import (
 	"strings"
 )
 
-// Sscan parses name according to pattern, storing the value of each
-// "{variable}" segment into successive variables. Literal pattern segments
-// must be equal to the corresponding name segment. A full name
-// ("//host/...") is parsed by its path only; the service host is ignored.
+// Sscan reads name with pattern, and stores the value of each "{variable}"
+// segment of pattern in the next pointer of variables. Each literal segment
+// of pattern must be equal to the segment of name at the same position.
+// Sscan ignores the service name of a full name ("//service/...").
 //
-// The number of variables must equal the number of variable segments in
-// pattern, and every pointer must be non-nil.
+// Give one non-nil pointer for each variable segment of pattern. Sscan
+// returns an error when:
 //
-// An error is returned when pattern is a full resource name, a variable
-// pointer is nil, name contains a variable segment, a literal segment
-// differs, name has fewer or more segments than pattern, or the variable
-// counts do not line up. On error, some variables may already have been
-// assigned.
+//   - pattern is a full resource name,
+//   - a pointer of variables is nil,
+//   - name has a variable segment,
+//   - a literal segment of pattern is not equal to the segment of name,
+//   - name has fewer or more segments than pattern, or
+//   - the number of pointers is not the number of variable segments.
+//
+// The error does not match [ErrInvalidName]. When Sscan returns an error,
+// it can have set some of the variables.
 func Sscan(name, pattern string, variables ...*string) (err error) {
 	defer func() {
 		if err != nil {

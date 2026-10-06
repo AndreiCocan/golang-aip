@@ -5,27 +5,29 @@ import (
 	"fmt"
 )
 
-// ErrInvalidID matches every error returned by [ValidateUserSettable] via
-// [errors.Is]. Use it to distinguish a malformed resource ID from other
-// failures; the wrapped message states the specific rule that was violated.
+// ErrInvalidID matches, with [errors.Is], every error of
+// [ValidateUserSettable]. Use it to tell a malformed resource ID from
+// other failures. The message of the error gives the rule that the ID
+// does not obey.
 var ErrInvalidID = errors.New("invalid resource ID")
 
-// ValidateUserSettable reports whether id is a well-formed user-settable
-// resource ID. Call it when an end user supplies the trailing segment of a
-// resource name (typically the "{resource}_id" field on a Create request)
-// and reject the request if a non-nil error is returned.
+// ValidateUserSettable returns an error when id is not a valid resource ID
+// that a user can set. Call it when a user gives the last segment of a
+// resource name, usually in the "{resource}_id" field of a Create request.
+// Reject the request when it returns an error.
 //
-// The id must match ^[a-z][a-z0-9-]{2,61}[a-z0-9]$, that is:
-//   - 4 to 63 characters, per AIP-133's recommendation,
-//   - first character a lowercase ASCII letter,
-//   - last character a lowercase letter or digit (no trailing hyphen),
-//   - remaining characters lowercase letters, digits, or hyphens.
+// The id must match ^[a-z][a-z0-9-]{2,61}[a-z0-9]$. Thus:
 //
-// UUIDs get no special treatment: one that starts with a hex digit fails,
-// while a lowercase UUID that starts with a hex letter passes.
+//   - It has 4 to 63 characters, as AIP-133 recommends.
+//   - The first character is a lowercase ASCII letter.
+//   - The last character is a lowercase letter or a digit, not a hyphen.
+//   - The other characters are lowercase letters, digits, or hyphens.
 //
-// The returned error carries a human-readable reason suitable to propagate
-// to the caller, e.g. in an INVALID_ARGUMENT status message.
+// A UUID gets no special treatment. A UUID that starts with a hex digit
+// fails. A lowercase UUID that starts with a hex letter passes.
+//
+// The message of the error is for humans. It is correct to send it to the
+// client.
 func ValidateUserSettable(id string) error {
 	if len(id) < 4 || len(id) > 63 {
 		return fmt.Errorf("%w: must be between 4 and 63 characters", ErrInvalidID)

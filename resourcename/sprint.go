@@ -2,13 +2,12 @@ package resourcename
 
 import "strings"
 
-// Sprint formats pattern into a concrete resource name by substituting
-// successive variables for its "{variable}" segments, in order.
+// Sprint makes a resource name from pattern: it replaces each "{variable}"
+// segment with the next value of variables, in order.
 //
-// Sprint is lenient: extra variables are ignored, and a variable segment
-// with no corresponding value becomes an empty segment. Use [Sscan]'s
-// counterpart contract (one value per variable segment) to produce a name
-// that passes [Validate].
+// Sprint does not validate. It ignores extra values, and it makes an empty
+// segment for a variable that has no value. To make a name that [Validate]
+// accepts, give one valid value for each variable segment.
 func Sprint(pattern string, variables ...string) string {
 	var totalVarLen int
 	for _, v := range variables {

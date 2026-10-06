@@ -1,9 +1,9 @@
 package resourcename
 
-// ContainsWildcard reports whether any path segment of name is the
-// [Wildcard] "-". Services that do not support reading across collections
-// use it to detect and reject wildcard names; the service host of a full
-// name is not considered.
+// ContainsWildcard reports whether a segment of name is the [Wildcard]
+// "-". A service that does not support reads across collections uses it to
+// reject wildcard names. ContainsWildcard ignores the service name of a full
+// name.
 func ContainsWildcard(name string) bool {
 	var sc Scanner
 	sc.Init(name)

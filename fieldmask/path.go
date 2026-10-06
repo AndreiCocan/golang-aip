@@ -97,10 +97,10 @@ func splitPath(path string) ([]pathSegment, error) {
 	}
 }
 
-// pathPosition is a position inside a message type while resolving a path,
-// segment by segment. Exactly one of the fields describes the position:
-// a message whose fields can be named, a map whose key comes next, or a
-// terminal value that no path may traverse.
+// pathPosition is the place in a message type that a path reached, while
+// the path is resolved segment by segment. Exactly one field describes the
+// place: a message whose fields the next segment can name, a map whose key
+// comes next, a repeated field, or a scalar that no path can go into.
 type pathPosition struct {
 	message  protoreflect.MessageDescriptor
 	mapField protoreflect.FieldDescriptor
@@ -108,7 +108,7 @@ type pathPosition struct {
 	scalar   bool
 }
 
-// step advances the cursor by one path segment. throughRepeated tells
+// step moves the position by one path segment. throughRepeated tells
 // whether the segment after a repeated message field can name a field of
 // each element, which only a read mask allows.
 func (pos pathPosition) step(segment pathSegment, throughRepeated bool) (pathPosition, error) {
@@ -140,7 +140,7 @@ func (pos pathPosition) step(segment pathSegment, throughRepeated bool) (pathPos
 	}
 }
 
-// stepMapKey advances the cursor past a map key segment.
+// stepMapKey moves the position past a map key segment.
 func (pos pathPosition) stepMapKey(segment string) (pathPosition, error) {
 	if _, err := parseMapKey(pos.mapField.MapKey(), segment); err != nil {
 		return pathPosition{}, err
@@ -195,10 +195,10 @@ func parseMapKey(kd protoreflect.FieldDescriptor, segment string) (protoreflect.
 	}
 }
 
-// mapKey converts a path segment into a key of the map's key kind. Check
-// has validated the segment, so the conversion cannot fail. It also
-// canonicalises the segment, so that the paths "editions.05" and
-// "editions.5" address the one entry.
+// mapKey converts a path segment into a key of the map's key kind.
+// [CheckUpdate] or [CheckRead] validated the segment, so the conversion
+// cannot fail. mapKey also makes the segment canonical, so that the paths
+// "editions.05" and "editions.5" name the same entry.
 func mapKey(kd protoreflect.FieldDescriptor, segment string) protoreflect.MapKey {
 	v, err := parseMapKey(kd, segment)
 	if err != nil {
@@ -215,14 +215,15 @@ type maskNode struct {
 	terminal bool
 }
 
-// newMaskTree builds the path tree of an already [CheckUpdate]-validated mask.
+// newMaskTree builds the path tree of a mask that [CheckUpdate] or
+// [CheckRead] validated.
 // Nodes are keyed by segment value: quoting distinguishes a literal from
 // the wildcard while a path is resolved, and has served its purpose by now.
 func newMaskTree(paths []string) *maskNode {
 	root := &maskNode{children: map[string]*maskNode{}}
 
 	for _, path := range paths {
-		// Check has passed: the path splits.
+		// The mask is valid, so the path splits.
 		segments, err := splitPath(path)
 		if err != nil {
 			panic(fmt.Sprintf("fieldmask: path %q: %v", path, err))
@@ -239,6 +240,7 @@ func newMaskTree(paths []string) *maskNode {
 	return root
 }
 
+// insert adds the path of segments below n.
 func (n *maskNode) insert(segments []string) {
 	if len(segments) == 0 {
 		n.terminal = true
@@ -255,8 +257,8 @@ func (n *maskNode) insert(segments []string) {
 	child.insert(segments[1:])
 }
 
-// positionAt positions a cursor at the value of a field. When
-// throughRepeated is true, the cursor of a repeated message field is at the
+// positionAt returns the position at the value of a field. When
+// throughRepeated is true, the position of a repeated message field is the
 // message type of its elements, so that the next segment names a field of
 // each element.
 func positionAt(fd protoreflect.FieldDescriptor, throughRepeated bool) pathPosition {

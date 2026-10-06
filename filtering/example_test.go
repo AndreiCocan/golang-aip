@@ -11,8 +11,7 @@ import (
 
 // The usual service path. Build the schema once, from the aip tags of the
 // domain type. Then compile the filter of each List request, and give the
-// checked filter to a dialect, such as a PostgreSQL one, to query the
-// storage.
+// checked filter to a dialect, which queries the storage.
 func Example() {
 	type Book struct {
 		Name       string    `aip:"name,filter"`

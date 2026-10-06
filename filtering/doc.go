@@ -1,78 +1,73 @@
-// Package filtering parses, validates, and resolves AIP-160 filter
-// expressions, the `string filter` field of List requests in
-// resource-oriented APIs.
+// Package filtering parses and validates AIP-160 filter expressions, the
+// `string filter` field of List requests in resource-oriented APIs.
 //
-// The package is the backend-neutral base of a two-layer design:
+// The package does not query storage. It turns a filter string into a
+// checked tree in which each field path and each literal has a type. A
+// dialect package then translates the checked tree into the query language
+// of one storage backend.
 //
-//   - This package turns a filter string into a checked, fully typed
-//     expression tree.
-//   - Separate dialect packages, such as the filtering package of
-//     github.com/AndreiCocan/golang-aip-postgres, translate that tree
-//     into a storage backend's query language. The checked tree is the
-//     contract between the two layers; anyone can implement a dialect
-//     for another backend against it.
+// [Parse] turns a string into a syntax tree. [Check] turns a syntax tree
+// into a [CheckedFilter], validated against a [Schema]. [Compile] does both.
+// The schema declares the fields that a filter can name, with their types,
+// and the functions that a filter can call. It is also the allowlist: Check
+// rejects a filter that names a field that the schema does not declare.
+// [NewSchema] builds a schema from declarations such as [StringField] and
+// [Func]. [SchemaFromTags] builds it from the aip struct tags of a domain
+// type.
 //
-// The pipeline is [Parse] (string to syntactic tree), then [Check]
-// (syntactic tree to typed tree, validated against a [Schema]); [Compile]
-// runs both. The schema declares the filterable fields with their types
-// and doubles as the allowlist: filters referencing undeclared fields fail
-// Check.
+// A checked filter has only five node kinds: [And], [Or], [Not],
+// [Comparison], and [Search]. Each literal is a typed [Value], and each
+// field path is a [Field] whose segments have their types. [Walk] goes
+// through the tree.
 //
-//	schema := filtering.NewSchema(
-//		filtering.String("display_name"),
-//		filtering.Timestamp("create_time"),
-//		filtering.Enum("state", "ACTIVE", "DELETED"),
-//	)
-//	checked, err := filtering.Compile(req.GetFilter(), schema)
-//
-// [SchemaFromTags] builds the schema from the aip struct tags of a domain type
-// instead, such as filtering.SchemaFromTags(Book{}).
-//
-// A [CheckedFilter] filter contains only five node kinds ([And], [Or], [Not],
-// [Comparison], and [Search]) with every literal resolved to a typed
-// [Value] and every field path resolved to a [Field] whose segments carry
-// their types. [Walk] traverses the tree.
-//
-// All errors for malformed or invalid filters match [ErrInvalidFilter]
-// with [errors.Is] and carry the byte offset of the problem; services
-// should surface them as an INVALID_ARGUMENT response.
+// Each error for a malformed or invalid filter matches [ErrInvalidFilter]
+// with [errors.Is], and holds the byte offset of the problem. Such an
+// error is bad client input.
 //
 // # Supported syntax
 //
-// The full official filter grammar is parsed: comparators (=, !=, <, <=,
-// >, >=), the has operator (:) for repeated fields, maps, messages, and
-// presence tests, AND / OR / NOT (and the - negation prefix), parentheses,
-// dotted field traversal, functions, and bare search terms. Note that OR
-// binds tighter than AND, the opposite of most programming languages.
+// Parse accepts the full filter grammar of AIP-160:
 //
-// Literals are typed by the field they are compared against: RFC 3339
-// timestamps (quote them; the time-of-day colons would otherwise split
-// the token), seconds durations like 20s or 1.5s, integers, floats with
-// exponents, true/false, case-sensitive enum names, and null for
-// message-backed fields. A * inside a string compared with = or != is a
-// wildcard; the grammar defines no escape for a literal asterisk.
+//   - the comparators =, !=, <, <=, >, and >=,
+//   - the has operator (:) for repeated fields, maps, messages, and
+//     presence tests,
+//   - AND, OR, NOT, and the - prefix for negation,
+//   - parentheses, dotted field paths, function calls, and bare search
+//     terms.
 //
-// Bare terms with no field and no comparator (`Hugo`, `New York`) are
-// valid filters that check into [Search] nodes. How, and whether, they
-// match is a dialect decision: backends without a text-search capability
-// reject them.
+// OR binds tighter than AND. This is the opposite of most programming
+// languages.
+//
+// The type of the field gives the type of the literal that it is compared
+// with:
+//
+//   - a timestamp is an RFC 3339 string. Quote it, because the colons of
+//     the time would split the token.
+//   - a duration is a number of seconds, such as 20s or 1.5s.
+//   - an enum value is a case-sensitive name.
+//   - null tests a message, timestamp, or duration field for no value.
+//
+// A * inside a string compared with = or != is a wildcard. The grammar has
+// no escape for a literal asterisk.
+//
+// A bare term with no field and no comparator, such as `Hugo` or
+// `New York`, is a valid filter. Check turns it into a [Search] node. The
+// dialect decides how such terms match.
 //
 // # Functions
 //
-// Filter functions must be declared in the schema with [Func]; calls
-// to undeclared functions fail Check. A function declared with [FuncExpand] is
-// a macro: at Check time the call is rewritten into an ordinary expression
-// tree, so it works on every dialect. A function without an expander
-// passes through as a [FuncCall] node for the dialect to translate
-// natively, or reject.
+// Declare each filter function in the schema with [Func]. Check rejects a
+// call to a function that the schema does not declare. A function with a
+// [FuncExpand] option is a macro: Check replaces the call with an ordinary
+// expression tree, so all dialects support it. Check keeps a call to a
+// function without an expander as a [FuncCall] node. The dialect then
+// translates it, or rejects it.
 //
 // # Writing a dialect
 //
-// A dialect package consumes a [CheckedFilter] filter and produces whatever its
-// backend needs: a SQL WHERE clause, a search query, a plan. There is no
-// interface to implement: expose whatever entry point suits the backend
-// and type-switch over the five node kinds. Reject what the backend cannot
-// express (commonly [Search], [FuncCall], and has restrictions on
-// repeated fields) with clear errors rather than approximating. See
-// github.com/AndreiCocan/golang-aip-postgres for a PostgreSQL dialect.
+// A dialect reads a [CheckedFilter] and makes what its backend needs, such
+// as a WHERE clause. There is no interface to implement: type-switch over
+// the five node kinds. Reject what the backend cannot express, such as
+// [Search], [FuncCall], or a has restriction on a repeated field, with a
+// clear error. Do not approximate it.
 package filtering

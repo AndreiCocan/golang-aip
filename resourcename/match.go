@@ -1,16 +1,17 @@
 package resourcename
 
-// Match reports whether name matches pattern segment-for-segment: literal
-// segments must be equal, and each "{variable}" in pattern accepts any
-// single non-empty segment of name, including the [Wildcard] "-".
+// Match reports whether name matches pattern, segment by segment. Each
+// literal segment of pattern must be equal to the segment of name at the
+// same position. Each "{variable}" segment of pattern matches one non-empty
+// segment of name, also the [Wildcard] "-".
 //
-// A full name ("//host/...") is matched by its path only; the service host
-// is ignored. The match fails when the segment counts differ, when pattern
-// is empty or a full name, when pattern hard-codes a wildcard, or when name
-// itself contains variable segments.
+// Match ignores the service name of a full name ("//service/..."). Match
+// returns false when the numbers of segments are different, when pattern is
+// empty or a full name, when pattern has a wildcard segment, or when name
+// has a variable segment.
 //
-// Match reports well-formedness of neither argument; validate separately
-// with [Validate] and [ValidatePattern] where needed.
+// Match does not validate name or pattern. Use [Validate] and
+// [ValidatePattern] for that.
 func Match(name, pattern string) bool {
 	var nameScanner, patternScanner Scanner
 	nameScanner.Init(name)

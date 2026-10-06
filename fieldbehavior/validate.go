@@ -9,35 +9,38 @@ import (
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 )
 
-// ValidateRequired returns a [*RequiredFieldsError], which matches
-// [ErrMissingRequired], with the path of every required field of the message
-// that is not populated. It returns nil when all required fields are
-// populated. A required field is populated when it has a value: non-zero for
-// scalars without explicit presence, present for messages, non-empty for
-// repeated fields and maps. Nested messages are validated wherever they are
-// populated, including inside repeated fields and map values.
+// ValidateRequired returns the path of each field of msg that has the
+// REQUIRED annotation and no value, in a [*RequiredFieldsError] that matches
+// [ErrMissingRequired]. It returns nil when all required fields have a
+// value. A field has a value when:
 //
-// Use it to validate create requests, where every required field must be
-// provided; for update requests use [ValidateRequiredWithMask]. Passing a
-// nil message panics, since there is no descriptor to validate against.
+//   - it is a scalar without explicit presence and it is not zero,
+//   - it has explicit presence and it is present, or
+//   - it is a repeated field or a map and it is not empty.
+//
+// ValidateRequired also validates each populated nested message, also inside
+// repeated fields and map values.
+//
+// Use it for a create request, where all required fields must have a value.
+// For an update request, use [ValidateRequiredWithMask]. A nil msg has no
+// descriptor, so ValidateRequired panics.
 func ValidateRequired(msg proto.Message) error {
 	return newRequiredFieldsError(missingRequired(msg.ProtoReflect(), ""))
 }
 
-// ValidateRequiredWithMask is [ValidateRequired] restricted to the fields
-// the mask covers, per the update rule that a required field may be omitted
-// as long as it is absent from the field mask.
+// ValidateRequiredWithMask is [ValidateRequired] for the fields that the
+// mask covers only. In an update, a required field can have no value when
+// the mask does not cover it.
 //
-// A mask path covers the field it names and, by prefix, everything below
-// it: "author" also validates the required subfields of author, whether or
-// not the message carries an author. A nil or empty mask means the implied
-// mask of populated fields, and a "*" path covers everything. Unknown paths
-// are skipped; validating mask paths themselves is the fieldmask package's
-// concern. Map keys in paths must be plain string keys; backtick-escaped or
-// integer keys are not resolved and are skipped.
+// A mask path covers the field that it names and all the fields below it:
+// "author" also validates the required subfields of author, also when msg
+// has no author. A nil or empty mask means the implied mask of the populated
+// fields. The "*" path covers all fields.
 //
-// Passing a nil message panics, since there is no descriptor to validate
-// against.
+// ValidateRequiredWithMask ignores a path that names an unknown field. Use
+// fieldmask.CheckUpdate to validate the paths. It also ignores a map key that
+// is in backticks or that is an integer: only plain string keys resolve.
+// A nil msg has no descriptor, so ValidateRequiredWithMask panics.
 func ValidateRequiredWithMask(msg proto.Message, mask *fieldmaskpb.FieldMask) error {
 	m := msg.ProtoReflect()
 
@@ -74,10 +77,13 @@ func newRequiredFieldsError(missing []string) error {
 // maskNode is one segment of a field mask path tree. A terminal node covers
 // the whole subtree below its path.
 type maskNode struct {
+	// children holds the node of each next segment, by its name.
 	children map[string]*maskNode
+	// terminal reports whether a path of the mask ends at this node.
 	terminal bool
 }
 
+// insert adds the path of segments below n.
 func (n *maskNode) insert(segments []string) {
 	if len(segments) == 0 {
 		n.terminal = true
@@ -108,9 +114,9 @@ func missingRequired(m protoreflect.Message, prefix string) []string {
 	return missing
 }
 
-// missingInField returns the path of one field when it is required and missing,
-// or, when it is populated, the missing paths of every nested message below
-// it.
+// missingInField returns the path of fd when fd is required and has no
+// value. When fd has a value, it returns the paths of the missing required
+// fields in the messages that fd holds.
 func missingInField(m protoreflect.Message, fd protoreflect.FieldDescriptor, path string) []string {
 	if !m.Has(fd) {
 		if Has(fd, annotations.FieldBehavior_REQUIRED) {
@@ -129,11 +135,11 @@ func missingInField(m protoreflect.Message, fd protoreflect.FieldDescriptor, pat
 	return missing
 }
 
-// missingInCoveredField checks a field that a terminal mask path covers. Beyond
-// [checkField] it descends into an unset singular message, because a path
-// covers everything below it: a mask of "author" validates author.name even
-// when the message carries no author, matching the "author.name" path that
-// names the subfield directly.
+// missingInCoveredField is [missingInField] for a field that a mask path
+// covers completely. It also goes into an unset singular message, because
+// the path covers all fields below it: the mask "author" validates
+// author.name also when the message has no author, as the mask
+// "author.name" does.
 func missingInCoveredField(
 	m protoreflect.Message,
 	fd protoreflect.FieldDescriptor,
@@ -228,8 +234,8 @@ func missingInCoveredMapKeys(
 	return missing
 }
 
-// joinPath joins a parent path and a segment with a dot, omitting the dot
-// for a root segment.
+// joinPath joins a parent path and a segment with a dot. When prefix is
+// empty, it returns segment.
 func joinPath(prefix, segment string) string {
 	if prefix == "" {
 		return segment

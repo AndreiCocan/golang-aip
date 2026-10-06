@@ -3,9 +3,9 @@ package filtering
 import "strings"
 
 // CheckedFilter is a filter that [Check] validated and resolved against a
-// [Schema]. It is the contract consumed by dialect packages: every literal
-// is typed, every field path is resolved, and only the node types below can
-// occur. A nil Expr means the filter was empty and matches everything.
+// [Schema]. Dialect packages read it: each literal has a type, each field
+// path is resolved, and only the five [Expr] node kinds occur. A nil Expr
+// means that the filter was empty and matches all resources.
 type CheckedFilter struct {
 	Expr Expr
 }
@@ -157,10 +157,12 @@ type FuncArg interface {
 	isFuncArg()
 }
 
-// Search holds global restrictions: bare terms with no field and no
-// comparator, such as the filter `Hugo 1862`. The service-wide semantics
-// are a fuzzy match across the entry; dialects without a text-search
-// capability should reject it.
+// Search holds the bare terms of a filter, with no field and no
+// comparator, such as `Hugo 1862`. AIP-160 calls them global restrictions
+// and defines them as a fuzzy match across the resource. The dialect decides
+// how the terms match, for example with a text search over the fields that
+// have the search option of the aip tag. A dialect that cannot search text
+// must reject a Search node.
 type Search struct {
 	Terms []string
 }

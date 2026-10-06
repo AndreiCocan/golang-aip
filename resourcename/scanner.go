@@ -2,18 +2,17 @@ package resourcename
 
 import "strings"
 
-// Scanner walks a resource name from left to right, yielding one [Segment]
-// per call to [Scanner.Scan]. It performs no validation: empty segments are
-// surfaced as empty [Segment] values, and any bytes between slashes are
-// returned as-is.
+// Scanner reads a resource name from left to right, one [Segment] for each
+// call to [Scanner.Scan]. It does not validate: it gives an empty segment as
+// an empty [Segment], and all bytes between slashes without a change.
 //
-// A name starting with "//" is a full resource name: the text between "//"
-// and the next "/" is the service host, reported by [Scanner.ServiceName]
-// and [Scanner.Full] rather than as a path segment. A single leading "/" is
-// skipped.
+// A name that starts with "//" is a full resource name. The text between
+// "//" and the next "/" is the service name. [Scanner.ServiceName] and
+// [Scanner.Full] give it, and Scan does not give it as a segment. Scan skips
+// one leading "/".
 //
-// The zero value is ready for [Scanner.Init]. A Scanner may be reused by
-// calling Init again. Not safe for concurrent use.
+// The zero value is ready for [Scanner.Init]. Call Init again to use a
+// Scanner for a different name. A Scanner is not safe for concurrent use.
 type Scanner struct {
 	name                     string
 	start, end               int
@@ -31,7 +30,7 @@ func (s *Scanner) Init(name string) {
 }
 
 // Scan advances to the next segment, reporting whether one is available. On
-// the first call it detects the "//host" prefix of a full name.
+// the first call it detects the "//service" prefix of a full name.
 func (s *Scanner) Scan() bool {
 	switch s.end {
 	case len(s.name):
@@ -89,12 +88,12 @@ func (s *Scanner) End() int {
 }
 
 // Full reports whether the scanned name is a full resource name, that is,
-// starts with "//" followed by a service host.
+// starts with "//" followed by a service name.
 func (s *Scanner) Full() bool {
 	return s.full
 }
 
-// ServiceName returns the service host of a full resource name, or the empty
+// ServiceName returns the service name of a full resource name, or the empty
 // string for a relative name.
 func (s *Scanner) ServiceName() string {
 	return s.name[s.serviceStart:s.serviceEnd]

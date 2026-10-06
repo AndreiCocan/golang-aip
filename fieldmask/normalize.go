@@ -25,8 +25,9 @@ import (
 // matches [ErrInvalidFieldMask] when a path does not resolve against the
 // message type of msg, for the same causes as [CheckRead]. Thus it accepts
 // a path through a repeated message field, such as "books.displayName",
-// which only a read mask allows; [CheckUpdate] rejects it. It does not detect a
-// "*" path together with other paths; [CheckUpdate] and [CheckRead] do.
+// which only a read mask allows. [CheckUpdate] rejects such a path.
+// Normalize does not find a "*" path together with other paths.
+// [CheckUpdate] and [CheckRead] do.
 func Normalize(mask *fieldmaskpb.FieldMask, msg proto.Message) (*fieldmaskpb.FieldMask, error) {
 	md := msg.ProtoReflect().Descriptor()
 

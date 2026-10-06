@@ -11,18 +11,21 @@ import (
 	"github.com/AndreiCocan/golang-aip/filtering/ast"
 )
 
-// Check validates a parsed filter against a schema and resolves it into a
-// [CheckedFilter] filter: field paths are verified and annotated with their
-// types, literals are converted to typed values, wildcard strings become
-// patterns, and declared functions are arity- and type-checked (and
-// expanded, for macro functions).
+// Check validates a parsed filter against schema and returns the
+// [CheckedFilter]. Check:
 //
-// Errors are [*CheckError] values matching [ErrInvalidFilter], except for
-// errors returned by function expanders, which are wrapped unchanged so
-// that internal failures are not reported as invalid filters.
+//   - resolves each field path and gives it its type,
+//   - converts each literal into a typed [Value],
+//   - converts each string with a * wildcard into a pattern, and
+//   - validates the number and the kinds of the arguments of each function
+//     call, and expands the calls to macro functions.
 //
-// schema must not be nil; use NewSchema() for a schema with no filterable
-// fields.
+// An error from Check is a [*CheckError] that matches [ErrInvalidFilter],
+// except an error from an [Expander]. Check wraps an expander error without
+// a change, so that an internal failure is not reported as an invalid
+// filter.
+//
+// schema must not be nil. For a schema with no fields, use NewSchema().
 func Check(filter *ast.Filter, schema *Schema) (*CheckedFilter, error) {
 	if filter == nil || filter.Expr == nil {
 		return &CheckedFilter{}, nil
@@ -38,11 +41,16 @@ func Check(filter *ast.Filter, schema *Schema) (*CheckedFilter, error) {
 	return &CheckedFilter{Expr: expr}, nil
 }
 
+// checker checks a syntax tree against a schema.
 type checker struct {
+	// schema declares the fields and the functions of the filter.
 	schema *Schema
+	// source is the complete filter, for the errors.
 	source string
 }
 
+// errorf returns a [*CheckError] at the byte offset pos, with a message
+// from format and args.
 func (c *checker) errorf(pos int, format string, args ...any) error {
 	return &CheckError{Filter: c.source, Pos: pos, Message: fmt.Sprintf(format, args...)}
 }
@@ -127,6 +135,7 @@ func (c *checker) term(t *ast.Term) (Expr, error) {
 	return x, nil
 }
 
+// simple checks a composite expression in parentheses, or a restriction.
 func (c *checker) simple(s ast.Simple) (Expr, error) {
 	switch s := s.(type) {
 	case *ast.Composite:
@@ -138,6 +147,8 @@ func (c *checker) simple(s ast.Simple) (Expr, error) {
 	}
 }
 
+// restriction checks a comparison, or a bare value without a comparator,
+// which is a global restriction such as a search term.
 func (c *checker) restriction(r *ast.Restriction) (Expr, error) {
 	if r.Op == ast.ComparatorNone {
 		return c.global(r.Comparable)

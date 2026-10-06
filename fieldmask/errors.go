@@ -2,19 +2,18 @@ package fieldmask
 
 import "errors"
 
-// ErrInvalidFieldMask is the sentinel matched by every error reporting a
-// field mask that cannot be applied to its message type: a path naming an
-// unknown field, traversing a value that has no subfields, addressing a
-// repeated field's elements, quoting a segment malformedly, or combining
-// the "*" wildcard with other paths. Services should map errors matching
-// this sentinel to an INVALID_ARGUMENT response:
+// ErrInvalidFieldMask matches, with [errors.Is], every error that reports a
+// field mask that does not apply to its message type. Such an error is bad
+// client input. A mask does not apply when a path:
 //
-//	if errors.Is(err, fieldmask.ErrInvalidFieldMask) {
-//		return nil, status.Error(codes.InvalidArgument, err.Error())
-//	}
+//   - names an unknown field,
+//   - goes into a value that has no subfields,
+//   - names the elements of a repeated field,
+//   - has a segment with incorrect quotes, or
+//   - is the "*" wildcard together with other paths.
 var ErrInvalidFieldMask = errors.New("invalid field mask")
 
-// ErrImmutable is the sentinel matched by every error reporting an [Update]
-// that would change a field annotated IMMUTABLE or IDENTIFIER. Services
-// should map errors matching this sentinel to an INVALID_ARGUMENT response.
+// ErrImmutable matches, with [errors.Is], every error that reports an
+// [Update] that would change a field with the IMMUTABLE or IDENTIFIER
+// annotation. Such an error is bad client input.
 var ErrImmutable = errors.New("cannot change immutable field")

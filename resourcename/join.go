@@ -2,10 +2,11 @@ package resourcename
 
 import "strings"
 
-// Join combines resource name fragments into a single resource name,
-// dropping empty segments and redundant slashes. If the first element is a
-// full name ("//host/..."), the service host is kept; a host on any later
-// element is dropped. Joining no non-empty segments returns "/".
+// Join joins resource name fragments into one resource name. It removes
+// empty segments and extra slashes. When the first fragment is a full name
+// ("//service/..."), the result keeps its service name. Join removes the
+// service name of a later fragment. When there are no non-empty segments,
+// Join returns "/".
 func Join(elems ...string) string {
 	segments := make([]string, 0, len(elems))
 
@@ -13,7 +14,7 @@ func Join(elems ...string) string {
 		var sc Scanner
 		sc.Init(elem)
 
-		// The "//host" prefix is only known after the first Scan, which
+		// The "//service" prefix is only known after the first Scan, which
 		// returns false for a host-only fragment; capture the host before
 		// deciding whether any path segments follow.
 		more := sc.Scan()

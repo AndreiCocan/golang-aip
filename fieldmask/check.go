@@ -8,32 +8,36 @@ import (
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 )
 
-// WildcardPath is the special field mask path meaning every field: full
-// replacement in an update mask, all fields in a read mask.
+// WildcardPath is the field mask path that selects all fields. In an update
+// mask it requests a full replacement. In a read mask it requests the full
+// resource. It must be the only path of the mask.
 const WildcardPath = "*"
 
-// CheckUpdate validates the mask's paths against the message type of msg. It
-// reports, with an error matching [ErrInvalidFieldMask], paths that name
-// unknown fields, traverse values that have no subfields, address repeated
-// field elements, use malformed backtick quoting, or combine the "*"
-// wildcard with other paths.
+// CheckUpdate validates the paths of an update mask against the message
+// type of msg. It returns an error that matches [ErrInvalidFieldMask] when a
+// path:
 //
-// A nil or empty mask is valid: an omitted mask has a meaning of its own in
-// both updates and reads. [Update] runs the same validation, so CheckUpdate is
-// for failing fast before fetching the resource. Use [CheckRead] for a read
-// mask.
+//   - names an unknown field,
+//   - goes into a value that has no subfields,
+//   - goes into a repeated field,
+//   - has incorrect backtick quotes, or
+//   - is the "*" wildcard together with other paths.
+//
+// A nil or empty mask is valid, because an omitted mask has its own meaning.
+// [Update] does the same validation. Call CheckUpdate before you read the
+// stored resource, to fail early. For a read mask, use [CheckRead].
 func CheckUpdate(mask *fieldmaskpb.FieldMask, msg proto.Message) error {
 	return check(mask, msg, false)
 }
 
 // CheckRead validates the paths of a read mask against the message type of
-// msg. It is [CheckUpdate], except that a path can go through a repeated message
-// field to name a field of each element: "books.title" selects the title of
-// every book of a list response. A path still cannot address an element by
-// its index, or go through a repeated field of scalars.
+// msg. It is [CheckUpdate], except that a path can go through a repeated
+// message field to name a field of each element: "books.title" selects the
+// title of each book of a list response. A path cannot name an element by its
+// index, or go through a repeated field of scalars.
 //
-// [Prune] runs the same validation, so CheckRead is for failing fast before
-// the response is computed.
+// [Prune] does the same validation. Call CheckRead before you compute the
+// response, to fail early.
 func CheckRead(mask *fieldmaskpb.FieldMask, msg proto.Message) error {
 	return check(mask, msg, true)
 }
@@ -64,8 +68,9 @@ func check(mask *fieldmaskpb.FieldMask, msg proto.Message, throughRepeated bool)
 	return nil
 }
 
-// IsWildcard reports whether the mask is the wildcard mask, which
-// requests a full replacement of the resource in an update.
+// IsWildcard reports whether the only path of the mask is [WildcardPath].
+// Such a mask requests a full replacement in an update, and the full
+// resource in a read.
 func IsWildcard(mask *fieldmaskpb.FieldMask) bool {
 	return len(mask.GetPaths()) == 1 && mask.GetPaths()[0] == WildcardPath
 }

@@ -2,15 +2,18 @@ package pagination
 
 import "fmt"
 
-// ResolvePageSize resolves a request's page_size field against the service's
-// default and maximum. A zero requested size means the client left the
-// field unset and yields defaultSize; a size above maxSize is capped to
-// maxSize; a maxSize of zero disables the cap. A negative requested size
-// is a client error matching [ErrInvalidPageSize], which services should
-// surface as an INVALID_ARGUMENT response.
+// ResolvePageSize applies the default and the maximum of the service to the
+// page_size field of a request:
 //
-// defaultSize must be positive and maxSize non-negative; a configuration
-// violating either also fails with [ErrInvalidPageSize].
+//   - A requested size of zero means that the client did not set the
+//     field. It gives defaultSize.
+//   - A requested size above maxSize gives maxSize. A maxSize of zero
+//     means no maximum.
+//   - A negative requested size is bad client input. It gives an error
+//     that matches [ErrInvalidPageSize].
+//
+// defaultSize must be positive, and maxSize must not be negative. Another
+// configuration also gives an error that matches [ErrInvalidPageSize].
 func ResolvePageSize(requested, defaultSize, maxSize int32) (int32, error) {
 	switch {
 	case defaultSize <= 0:

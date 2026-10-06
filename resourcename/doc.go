@@ -1,17 +1,18 @@
-// Package resourcename parses, formats, and validates resource names in
+// Package resourcename parses, formats, and validates the resource names of
 // resource-oriented APIs.
 //
-// A resource name is a slash-separated path such as
-// "publishers/123/books/les-miserables", optionally prefixed by a service
-// host in the full form "//library.example.com/publishers/123". A pattern is
-// a template for such names, with snake_case variables in braces:
-// "publishers/{publisher}/books/{book}".
+// A resource name is a path of segments with slashes between them, such as
+// "publishers/123/books/les-miserables". A full resource name starts with
+// "//" and a service name: "//library.example.com/publishers/123". A
+// pattern is a template for resource names, with snake_case variables in
+// braces: "publishers/{publisher}/books/{book}".
 //
-// Validate concrete names with [Validate] and patterns with
-// [ValidatePattern]; failures match [ErrInvalidName] and [ErrInvalidPattern]
-// respectively. Parse names with [Sscan], format them with [Sprint], and
-// test them against a pattern with [Match]. [Join], [HasAncestor], [Ancestor],
-// and [Parents] manipulate the hierarchy, and [ContainsWildcard] detects the
-// "-" segment used when reading across collections. The low-level [Scanner]
-// and [Segment] types walk a name without allocating.
+// [Validate] validates a resource name, and [ValidatePattern] validates a
+// pattern. Their errors match [ErrInvalidName] and [ErrInvalidPattern].
+// [Sscan] reads the variables of a name with a pattern, [Sprint] makes a
+// name from a pattern, and [Match] compares a name with a pattern. [Join],
+// [HasAncestor], [Ancestor], and [Parents] work on the hierarchy of a name.
+// [ContainsWildcard] finds the "-" segment of a read across collections.
+// [Scanner] and [Segment] read a name one segment at a time, without
+// allocation.
 package resourcename

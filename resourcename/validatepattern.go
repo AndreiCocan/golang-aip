@@ -6,28 +6,28 @@ import (
 	"strings"
 )
 
-// ErrInvalidPattern matches every error returned by [ValidatePattern] via
-// [errors.Is]. The wrapped message states the specific rule that was
-// violated.
+// ErrInvalidPattern matches each error of [ValidatePattern] with
+// [errors.Is]. The message of the error gives the rule that the pattern does
+// not obey.
 var ErrInvalidPattern = errors.New("invalid resource name pattern")
 
-// ValidatePattern reports whether pattern is a well-formed resource name
-// pattern such as "publishers/{publisher}/books/{book}".
+// ValidatePattern returns an error when pattern is not a valid resource
+// name pattern, such as "publishers/{publisher}/books/{book}".
 //
-// Rules:
-//   - The pattern must be non-empty and relative; full "//host/..." forms
-//     are rejected because patterns are written relative to a service.
-//   - Every segment must be non-empty.
-//   - The [Wildcard] "-" must not be hard-coded in a pattern; use a
-//     "{variable}" where a value is supplied at that position.
-//   - Variables must be snake_case ("[a-z][_a-z0-9]*[a-z0-9]"), must not end
-//     in "_id" (the variable for a book is "{book}", not "{book_id}"), and
-//     must be unique within the pattern.
-//   - Literal segments name collections or singletons and must be lower
-//     camel case alphanumeric ("[a-z][a-zA-Z0-9]*").
+// The rules are:
 //
-// The returned error matches [ErrInvalidPattern] and carries a
-// human-readable reason.
+//   - The pattern is not empty, and it is relative. A full "//service/..."
+//     pattern is not valid, because a pattern is relative to its service.
+//   - No segment is empty.
+//   - No segment is the [Wildcard] "-". Use a "{variable}" segment at that
+//     position.
+//   - A variable is snake_case ("[a-z][_a-z0-9]*[a-z0-9]"), does not end in
+//     "_id", and occurs only once. The variable for a book is "{book}", not
+//     "{book_id}".
+//   - A literal segment is the name of a collection or a singleton, in
+//     lower camel case ("[a-z][a-zA-Z0-9]*").
+//
+// The error matches [ErrInvalidPattern].
 func ValidatePattern(pattern string) error {
 	if pattern == "" {
 		return fmt.Errorf("%w: empty", ErrInvalidPattern)

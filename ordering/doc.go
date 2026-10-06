@@ -1,55 +1,39 @@
 // Package ordering parses and validates order_by expressions, the
 // `string order_by` field of List requests in resource-oriented APIs.
 //
-// The package is the backend-neutral base of a two-layer design:
+// The package does not sort. It turns an order_by string into a checked
+// list of sort keys. A dialect package then translates the list into the
+// query language of one storage backend, such as an ORDER BY clause.
 //
-//   - This package turns an order_by string into a checked list of
-//     ordering keys.
-//   - Separate dialect packages, such as the ordering package of
-//     github.com/AndreiCocan/golang-aip-postgres, translate that list
-//     into a storage backend's query language. The checked order_by is
-//     the contract between the two layers; anyone can implement a
-//     dialect for another backend against it.
+// [Parse] turns a string into a syntax tree. [Check] turns a syntax tree
+// into a [CheckedOrderBy], validated against a [Schema]. [Compile] does
+// both. The schema declares the field paths that an order_by can name. It
+// is also the allowlist: Check rejects an order_by that names a field that
+// the schema does not declare. [NewSchema] builds a schema from paths, and
+// [SchemaFromTags] builds it from the aip struct tags of a domain type.
 //
-// The pipeline is [Parse] (string to syntactic tree), then [Check]
-// (syntactic tree to validated keys, resolved against a [Schema]);
-// [Compile] runs both. The schema declares the orderable field paths and
-// doubles as the allowlist: order_bys referencing undeclared fields fail
-// Check.
+// A checked order_by is a list of [Key] values. Each key is a dotted field
+// path with a direction. An empty order_by is valid and gives no keys. It
+// means the default order of the service.
 //
-//	schema := ordering.NewSchema(
-//		"display_name",
-//		"create_time",
-//		"author.name",
-//	)
-//	checked, err := ordering.Compile(req.GetOrderBy(), schema)
-//
-// [SchemaFromTags] builds the schema from the aip struct tags of a domain type
-// instead, such as ordering.SchemaFromTags(Book{}).
-//
-// A [CheckedOrderBy] order_by is a list of [Key] keys, each a dotted path with
-// a direction. An empty order_by is valid, yields no keys, and means the
-// service's default order.
-//
-// All errors for malformed or invalid order_bys match [ErrInvalidOrderBy]
-// with [errors.Is] and carry the byte offset of the problem; services
-// should surface them as an INVALID_ARGUMENT response.
+// Each error for a malformed or invalid order_by matches
+// [ErrInvalidOrderBy] with [errors.Is], and holds the byte offset of the
+// problem. Such an error is bad client input.
 //
 // # Supported syntax
 //
-// An order_by is a comma-separated list of fields: "foo,bar". Ascending
-// is the default; a "desc" suffix (matched case-insensitively) reverses a
-// field: "foo, bar desc". Redundant whitespace is insignificant, so
-// "foo, bar desc", " foo , bar desc ", and "foo,bar desc" are equivalent.
-// Subfields are addressed with dots: "address.street".
+// An order_by is a comma-separated list of fields: "foo,bar". The default
+// direction is ascending. A "desc" suffix makes a field descending:
+// "foo, bar desc". The suffix is case-insensitive. Extra whitespace has no
+// effect, so "foo, bar desc", " foo , bar desc ", and "foo,bar desc" are
+// equal. Dots name subfields: "address.street".
 //
-// An explicit "asc" suffix is not part of the order_by syntax and is
-// rejected. The "desc" keyword is positional: a field named "desc"
-// remains referencable, and "desc desc" orders it descending.
+// An "asc" suffix is not part of the syntax, and Parse rejects it. Only the
+// position of "desc" makes it a suffix: a field can have the name "desc",
+// and "desc desc" sorts it descending.
 //
-// [Check] merges exact duplicate keys (same path, same direction) into
-// their first occurrence, and rejects an order_by that sorts one path
-// both ascending and descending. How each field's values compare (its
-// natural comparator) is the storage backend's concern, so it lives in
-// the dialect packages.
+// [Check] merges exact duplicate keys (same path, same direction) into the
+// first one. It rejects an order_by that sorts one path both ascending and
+// descending. How the values of a field compare is a property of the
+// storage, so the dialect decides it.
 package ordering

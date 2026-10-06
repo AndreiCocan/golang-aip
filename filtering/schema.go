@@ -22,10 +22,10 @@ type Decl interface {
 
 // NewSchema builds a schema from field and function declarations.
 //
-// Schemas are programmer input, so NewSchema panics instead of returning an
-// error: on a duplicate or empty name, or an invalid function declaration.
-// The field constructors, such as [EnumField] and [MessageField], panic on their own
-// invalid input.
+// A schema is programmer input, so NewSchema panics instead of returning an
+// error: on a duplicate or empty name, or on a function declaration that is
+// not valid. The field constructors, such as [EnumField] and
+// [MessageField], panic on their own input that is not valid.
 func NewSchema(decls ...Decl) *Schema {
 	s := &Schema{
 		fields: make(map[string]Type),
@@ -64,10 +64,10 @@ func (s *Schema) Field(path string) (*Field, error) {
 	return field, nil
 }
 
-// subfieldType returns the type of the path segment name below a field of type t:
-// a subfield of a message, the value of any key of a map, or a subfield of
-// the message elements of a repeated field. It reports false when t has no
-// such segment.
+// subfieldType returns the type of the path segment name below a field of
+// type t: a subfield of a message, the value of any key of a map, or a
+// subfield of the message elements of a repeated field. It reports false
+// when t has no such segment.
 func subfieldType(t Type, name string) (Type, bool) {
 	switch t.Kind {
 	case KindMessage:
@@ -87,14 +87,19 @@ func subfieldType(t Type, name string) (Type, bool) {
 	}
 }
 
-// FieldDecl declares one filterable field. Build one with [StringField], [IntField],
-// [FloatField], [BoolField], [EnumField], [TimestampField], [DurationField], [MessageField], [RepeatedField],
-// or [MapField].
+// FieldDecl declares one field that a filter can name. Build one with
+// [StringField], [IntField], [FloatField], [BoolField], [EnumField],
+// [TimestampField], [DurationField], [MessageField], [RepeatedField], or
+// [MapField].
 type FieldDecl struct {
+	// name is the API name of the field.
 	name string
-	typ  Type
+	// typ is the type of the field.
+	typ Type
 }
 
+// declare adds the field to s. It panics when the name is empty, or when s
+// already has a field with the name.
 func (d FieldDecl) declare(s *Schema) {
 	if d.name == "" {
 		panic("filtering: field declared with an empty name")
@@ -168,10 +173,10 @@ func MessageField(name string, fields ...FieldDecl) FieldDecl {
 	return FieldDecl{name: name, typ: Type{Kind: KindMessage, msg: msg}}
 }
 
-// RepeatedField declares a list field whose elements are described by elem,
-// which contributes both the field's name and the element type:
-// RepeatedField(String("tags")) is a list of strings named "tags". RepeatedField
-// fields are queried with the has operator: `tags:go`.
+// RepeatedField declares a list field. elem gives both the name of the
+// field and the type of its elements: RepeatedField(StringField("tags")) is
+// a list of strings with the name "tags". A filter tests a repeated field
+// with the has operator: `tags:go`.
 func RepeatedField(elem FieldDecl) FieldDecl {
 	if elem.typ.Kind == KindRepeated || elem.typ.Kind == KindMap {
 		panic(
@@ -184,10 +189,10 @@ func RepeatedField(elem FieldDecl) FieldDecl {
 	return FieldDecl{name: elem.name, typ: Type{Kind: KindRepeated, Elem: &t}}
 }
 
-// MapField declares a string-keyed map field whose values are described by
-// value, which contributes both the field's name and the value type:
-// MapField(String("labels")) is a map from string keys to string values named
-// "labels". Maps are queried by key: `labels:env`, `labels.env = prod`.
+// MapField declares a map field with string keys. value gives both the name
+// of the field and the type of its values: MapField(StringField("labels"))
+// is a map from string keys to string values with the name "labels". A
+// filter names a map value by its key: `labels:env`, `labels.env = prod`.
 func MapField(value FieldDecl) FieldDecl {
 	if value.typ.Kind == KindRepeated || value.typ.Kind == KindMap {
 		panic(fmt.Sprintf("filtering: map field %q of repeated or map value type", value.name))
@@ -198,23 +203,33 @@ func MapField(value FieldDecl) FieldDecl {
 	return FieldDecl{name: value.name, typ: Type{Kind: KindMap, Elem: &t}}
 }
 
-// Expander rewrites a function call into a checked filter expression at
-// Check time. It receives the schema being checked against (use
-// [Schema.Field] to resolve field paths) and the call's literal arguments.
+// Expander replaces a call to a macro function with a checked filter
+// expression, during [Check]. It receives the schema of the check and the
+// literal arguments of the call. Use [Schema.Field] to resolve field paths.
 //
-// Returning an error fails the Check; return a [*CheckError] to report an
-// invalid filter, or any other error to report an internal problem.
+// An error from an Expander stops Check. Return a [*CheckError] for an
+// invalid filter. Any other error tells about an internal problem.
 type Expander func(s *Schema, args []Value) (Expr, error)
 
 // FuncDecl declares a filter function. Build one with [Func].
 type FuncDecl struct {
-	name    string
-	args    []Kind
-	result  Kind
-	expand  Expander
+	// name is the name of the function, which can have dots.
+	name string
+	// args holds the kind of each argument.
+	args []Kind
+	// result is the kind of the result, or KindInvalid when no option set
+	// it.
+	result Kind
+	// expand rewrites a call, or is nil.
+	expand Expander
+	// declErr is the error of an option that is not valid, or "".
 	declErr string
 }
 
+// declare adds the function to s. It panics when an option is not valid,
+// when the name is empty, when s already has a function with the name,
+// when the function has neither a result nor an expander, and when a
+// function with an expander does not return bool.
 func (d FuncDecl) declare(s *Schema) {
 	if d.declErr != "" {
 		panic("filtering: " + d.declErr)
@@ -248,23 +263,30 @@ func (d FuncDecl) declare(s *Schema) {
 	}
 }
 
+// declaredFunc is a function of a [Schema], after [FuncDecl.declare] checked
+// it.
 type declaredFunc struct {
-	name   string
-	args   []Kind
+	// name is the name of the function.
+	name string
+	// args holds the kind of each argument.
+	args []Kind
+	// result is the type of the result.
 	result Type
+	// expand rewrites a call, or is nil.
 	expand Expander
 }
 
-// FuncOption configures a [Func] declaration.
+// FuncOption sets an option of a [Func] declaration.
 type FuncOption func(*FuncDecl)
 
-// Func declares a filter function, callable as `name(args...)`. Names
-// may be dotted, like "math.mem". A function either carries an [FuncExpand]
-// rewrite (a macro every dialect supports) or is passed through to the
-// dialect as a [FuncCall] to translate natively.
+// Func declares a filter function that a filter calls as `name(args...)`.
+// The name can have dots, such as "math.mem". A function with the
+// [FuncExpand] option is a macro, and all dialects support it. [Check] keeps
+// a call to a function without it as a [FuncCall], for the dialect to
+// translate.
 //
-// Per AIP filtering semantics a service must document the functions it
-// supports; an undeclared function fails [Check].
+// AIP-160 requires a service to document the functions that it supports.
+// Check rejects a call to a function that the schema does not declare.
 func Func(name string, opts ...FuncOption) FuncDecl {
 	d := FuncDecl{name: name}
 	for _, opt := range opts {
@@ -274,8 +296,8 @@ func Func(name string, opts ...FuncOption) FuncDecl {
 	return d
 }
 
-// FuncArgs declares the function's parameter kinds; calls must match the exact
-// arity. Only scalar kinds are allowed.
+// FuncArgs declares the kinds of the arguments of the function. A call must
+// have exactly that number of arguments. Only scalar kinds are valid.
 func FuncArgs(kinds ...Kind) FuncOption {
 	return func(d *FuncDecl) {
 		for _, k := range kinds {
@@ -288,9 +310,9 @@ func FuncArgs(kinds ...Kind) FuncOption {
 	}
 }
 
-// FuncReturns declares the function's result kind. Only scalar kinds are
-// allowed. A function used as a bare restriction, like `overdue()`, must
-// return KindBool.
+// FuncReturns declares the kind of the result of the function. Only scalar
+// kinds are valid. A function that a filter calls alone, such as
+// `overdue()`, must return KindBool.
 func FuncReturns(kind Kind) FuncOption {
 	return func(d *FuncDecl) {
 		if !isScalarKind(kind) {
@@ -301,10 +323,10 @@ func FuncReturns(kind Kind) FuncOption {
 	}
 }
 
-// FuncExpand attaches a macro expander: at Check time the call is rewritten
-// into the returned expression, so the function works on every dialect
-// without backend support. Expanded functions must take literal arguments
-// and return bool.
+// FuncExpand makes the function a macro: [Check] replaces each call with
+// the expression that fn returns. Thus all dialects support the function.
+// The arguments of a call must be literals, and the function must return
+// bool.
 func FuncExpand(fn Expander) FuncOption {
 	return func(d *FuncDecl) { d.expand = fn }
 }

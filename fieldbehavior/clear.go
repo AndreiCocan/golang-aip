@@ -8,15 +8,15 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
-// Clear clears every field of the message, recursively, that is annotated
-// with any of the given behaviors. Fields of nested messages are cleared
-// wherever they appear, including inside repeated fields and map values,
-// since a nested message's annotations are independent of its parent's.
+// Clear clears each field of msg that has one or more of the given
+// behaviors, at any depth. It also clears such fields in the messages inside
+// repeated fields and map values, because the annotations of a nested
+// message do not depend on its parent.
 //
-// Clearing OUTPUT_ONLY (and, on create, IDENTIFIER) from a request payload
-// implements the rule that clients cannot write server-managed fields:
-// their values are dropped without error. A nil message has no fields to
-// clear, and is a no-op rather than a panic.
+// Use it on a create or update payload to drop the fields that a client
+// cannot write: clear OUTPUT_ONLY, and IDENTIFIER on create. Clear returns
+// no error for the dropped values. A nil msg has no fields, so Clear does
+// nothing.
 func Clear(msg proto.Message, behaviors ...annotations.FieldBehavior) {
 	if msg == nil {
 		return
@@ -25,6 +25,8 @@ func Clear(msg proto.Message, behaviors ...annotations.FieldBehavior) {
 	clearMessage(msg.ProtoReflect(), behaviors)
 }
 
+// clearMessage clears each field of m that has one of behaviors, and does
+// the same in the nested messages of the other fields.
 func clearMessage(m protoreflect.Message, behaviors []annotations.FieldBehavior) {
 	m.Range(func(fd protoreflect.FieldDescriptor, v protoreflect.Value) bool {
 		if hasAny(fd, behaviors) {

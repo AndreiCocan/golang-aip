@@ -90,7 +90,7 @@ func pruneMapKeys(mp protoreflect.Map, fd protoreflect.FieldDescriptor, node *ma
 		}
 
 		if !child.terminal {
-			// Below a key the value is a message; Check has passed.
+			// Below a key the value is a message; CheckRead has passed.
 			pruneTree(v.Message(), child)
 		}
 

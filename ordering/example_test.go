@@ -10,9 +10,8 @@ import (
 
 // The usual service path. Build the schema once, from the aip tags of the
 // domain type. Then compile the order_by of each List request, and give
-// the checked order_by to a dialect, such as a PostgreSQL one, to sort the
-// query. An empty order_by gives no fields: use the default order of the
-// service.
+// the checked order_by to a dialect, which sorts the query. An empty
+// order_by gives no keys: use the default order of the service.
 func Example() {
 	type Book struct {
 		Name       string    `aip:"name,order"`

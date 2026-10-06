@@ -5,28 +5,28 @@ import (
 	"fmt"
 )
 
-// ErrInvalidName matches every error returned by [Validate] via [errors.Is].
-// The wrapped message states the specific rule that was violated.
+// ErrInvalidName matches each error of [Validate] with [errors.Is]. The
+// message of the error gives the rule that the name does not obey.
 var ErrInvalidName = errors.New("invalid resource name")
 
-// Validate reports whether name is a well-formed concrete resource name.
-// Both relative names ("publishers/123") and full names
-// ("//library.example.com/publishers/123") are accepted; pattern syntax is
-// rejected; for patterns, use [ValidatePattern].
+// Validate returns an error when name is not a valid resource name. It
+// accepts relative names ("publishers/123") and full names
+// ("//library.example.com/publishers/123"). It rejects patterns: for a
+// pattern, use [ValidatePattern].
 //
-// Rules:
-//   - The name must be non-empty and every segment must be non-empty.
-//   - Each segment must be a valid RFC 1123 host name: dot-separated labels
-//     of letters, digits, and hyphens, with no leading or trailing hyphen
-//     and at most 63 characters per label.
-//   - The [Wildcard] "-" is allowed as a whole segment, standing for an
-//     unspecified ID when reading across collections.
-//   - Variable segments ("{name}") are rejected: a concrete name has no
-//     placeholders.
-//   - For a full name, the service host must be a valid DNS name.
+// The rules are:
 //
-// The returned error matches [ErrInvalidName] and carries a human-readable
-// reason suitable to propagate to the caller.
+//   - The name and each of its segments are not empty.
+//   - Each segment is a valid RFC 1123 host name: labels of letters,
+//     digits, and hyphens with dots between them. A label does not start or
+//     end with a hyphen, and has 63 characters or fewer.
+//   - The [Wildcard] "-" is a valid segment. It stands for any ID in a
+//     read across collections.
+//   - A variable segment, such as "{book}", is not valid.
+//   - The service name of a full name is a valid DNS name.
+//
+// The error matches [ErrInvalidName]. Its message is for humans, and it is
+// correct to send it to the client.
 func Validate(name string) error {
 	if name == "" {
 		return fmt.Errorf("%w: empty", ErrInvalidName)

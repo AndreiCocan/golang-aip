@@ -13,7 +13,7 @@ import (
 // length prefix, so distinct splits of the same text stay distinct;
 // pointers are dereferenced so *string and string arguments hash alike.
 // No arguments hash to zero, which keeps a zero Token interchangeable
-// with Parse("").
+// with ParseToken("").
 func hashArgs(args []any) uint64 {
 	if len(args) == 0 {
 		return 0
@@ -102,6 +102,10 @@ func writeShape(b *strings.Builder, t reflect.Type, path map[reflect.Type]bool) 
 	}
 }
 
+// writeStructShape writes the shape of the struct type t: the name and the
+// shape of each exported field. A struct without exported fields writes
+// its type name. path holds the types on the current path, as in
+// writeShape.
 func writeStructShape(b *strings.Builder, t reflect.Type, path map[reflect.Type]bool) {
 	exported := make([]reflect.StructField, 0, t.NumField())
 

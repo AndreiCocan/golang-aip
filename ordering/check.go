@@ -6,11 +6,10 @@ import (
 	"github.com/AndreiCocan/golang-aip/ordering/ast"
 )
 
-// Check validates a parsed order_by against a schema and resolves it into
-// a [CheckedOrderBy] order_by: every field path must be declared in the schema,
-// exact duplicates (same path, same direction) are merged into their first
-// occurrence, and a path ordered in two contradictory directions is
-// rejected.
+// Check validates a parsed order_by against schema and returns the
+// [CheckedOrderBy]. Each field path must be declared in the schema. Check
+// merges exact duplicates (same path, same direction) into the first one,
+// and rejects a path that has two directions.
 //
 // Errors are [*CheckError] values matching [ErrInvalidOrderBy], carrying
 // the byte offset of the offending field.

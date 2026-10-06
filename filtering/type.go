@@ -1,9 +1,10 @@
 package filtering
 
 // Kind classifies both the declared type of a schema field and the resolved
-// type of a checked [Value]. The kinds up to and including KindMap appear in
-// schemas; KindNull, KindPresence, and KindPattern appear only in values, where
-// the schema context has given a literal one of those special meanings.
+// type of a checked [Value]. The kinds up to and including KindMap occur in
+// schemas. KindNull, KindPresence, and KindPattern occur only in values,
+// where the field that a literal is compared with gives it that special
+// meaning.
 type Kind int
 
 const (
@@ -87,6 +88,8 @@ type Type struct {
 	msg *messageType
 }
 
+// messageType holds the subfields of a message field.
 type messageType struct {
+	// fields holds the type of each subfield, by its name.
 	fields map[string]Type
 }

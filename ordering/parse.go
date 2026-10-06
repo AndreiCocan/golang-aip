@@ -64,7 +64,9 @@ const (
 	tokenDot
 )
 
+// token is a token of an order_by.
 type token struct {
+	// kind is the kind of the token.
 	kind tokenKind
 	// pos is the byte offset of the token in the order_by string.
 	pos int
@@ -127,10 +129,14 @@ func lex(orderBy string) ([]token, error) {
 	return append(tokens, token{kind: tokenEOF, pos: len(orderBy)}), nil
 }
 
+// parser reads the tokens of an order_by.
 type parser struct {
+	// orderBy is the complete order_by, for the errors.
 	orderBy string
-	tokens  []token
-	i       int
+	// tokens holds the tokens of the order_by. The last token is EOF.
+	tokens []token
+	// i is the index of the current token.
+	i int
 }
 
 // peek returns the current token without consuming it.
@@ -143,6 +149,8 @@ func (p *parser) next() {
 	}
 }
 
+// errorf returns a [*ParseError] at the byte offset pos, with a message
+// from format and args.
 func (p *parser) errorf(pos int, format string, args ...any) error {
 	return &ParseError{OrderBy: p.orderBy, Pos: pos, Message: fmt.Sprintf(format, args...)}
 }

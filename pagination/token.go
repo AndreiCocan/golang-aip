@@ -17,20 +17,26 @@ const tokenVersion = 1
 // version byte, the request-args checksum, and the cursor-shape checksum.
 const headerLen = 1 + 8 + 8
 
-// Token is a decoded page token. The zero value is a first page: it
-// carries no cursor and mints tokens for the second page.
+// Token is a decoded page token. The zero value is the first page of a
+// request with no requestArgs: it has no cursor, and [Token.Next] makes the
+// token of the second page.
 type Token struct {
 	argsSum  uint64
 	shapeSum uint64
 	payload  []byte
 }
 
-// ParseToken decodes a request's page_token field. An empty token is a first
-// page and always succeeds. The requestArgs are the request fields that
-// must not change between pages, such as the parent, filter, and order_by;
-// a token minted under different arguments fails with
-// [ErrInvalidPageToken]. Pass page_size and skip through PageSize instead
-// of including them here: AIP-158 allows them to vary between pages.
+// ParseToken decodes the page_token field of a request. An empty token is a
+// first page, and ParseToken then always succeeds.
+//
+// requestArgs are the request fields that must not change between pages,
+// such as the parent, the filter, and the order_by. A token made with
+// different arguments gives an error that matches [ErrInvalidPageToken].
+// Do not put page_size or skip in requestArgs, because AIP-158 lets them
+// change between pages. Give page_size to [ResolvePageSize].
+//
+// A malformed or damaged token also gives an error that matches
+// [ErrInvalidPageToken].
 func ParseToken(token string, requestArgs ...any) (Token, error) {
 	argsSum := hashArgs(requestArgs)
 	if token == "" {
@@ -53,12 +59,16 @@ func ParseToken(token string, requestArgs ...any) (Token, error) {
 	}, nil
 }
 
-// Cursor reports whether the token carries a cursor (false on the first
-// page) and, when present, decodes it into dst, which must be a non-nil
-// pointer to the same shape the cursor was minted from. A dst that is not
-// a usable pointer fails with [ErrInvalidCursor]; a cursor minted from a
-// different shape, or a corrupted payload, fails with
-// [ErrInvalidPageToken].
+// Cursor decodes the cursor of the token into dst. It reports false, with
+// no error, when the token has no cursor, which is the first page.
+//
+// dst must be a non-nil pointer to a value of the same shape as the cursor
+// that [Token.Next] encoded. Cursor returns an error that matches:
+//
+//   - [ErrInvalidCursor] when dst is not a non-nil pointer, which is a bug in
+//     the service.
+//   - [ErrInvalidPageToken] when the cursor has a different shape than dst,
+//     or when its data is damaged.
 func (t Token) Cursor(dst any) (bool, error) {
 	v := reflect.ValueOf(dst)
 	if v.Kind() != reflect.Pointer || v.IsNil() {
@@ -80,11 +90,13 @@ func (t Token) Cursor(dst any) (bool, error) {
 	return true, nil
 }
 
-// Next mints the token for the page after this one from the caller's
-// cursor value, carrying over the request-args checksum the token was
-// parsed with. The cursor may be any gob-encodable value, typically a
-// small struct holding the ordering key of the page's last row; a value
-// gob cannot encode fails with [ErrInvalidCursor].
+// Next returns the next_page_token: the token of the page after this one,
+// with cursor in it. The token also holds the checksum of the requestArgs
+// of [ParseToken], so that the next request must have the same arguments.
+//
+// cursor can be any value that gob can encode, usually a small struct with
+// the sort key of the last row of the page. A nil cursor, or a value that
+// gob cannot encode, gives an error that matches [ErrInvalidCursor].
 func (t Token) Next(cursor any) (string, error) {
 	v := reflect.ValueOf(cursor)
 	for v.Kind() == reflect.Pointer && !v.IsNil() {

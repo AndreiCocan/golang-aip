@@ -6,22 +6,25 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
-// Copy copies every field annotated with any of the given behaviors from
-// src to dst. An annotated field unpopulated in src is cleared in dst, so
-// after Copy the annotated fields of dst mirror src exactly.
+// Copy copies each field that has one or more of the given behaviors from
+// src to dst. When such a field has no value in src, Copy clears it in dst.
+// After Copy, the annotated fields of dst are equal to those of src.
 //
-// Copy recurses through singular message fields (creating them in dst when
-// src carries annotated values below), but not through repeated fields or
-// maps, where no element correspondence between dst and src exists. Message,
-// repeated, and map values are copied by reference, not deep-copied.
+// Copy goes into singular message fields, and makes them in dst when src
+// has annotated values below them. Copy does not go into repeated fields or
+// maps, because the elements of dst and src do not correspond. Copy does not
+// deep-copy message, repeated, and map values: dst and src then share them.
 //
-// dst and src must share a message type; Copy panics otherwise, as does
-// passing a nil message. Copying OUTPUT_ONLY from the stored resource onto
-// an incoming payload restores server-managed fields the client cannot set.
+// Use it to put back the OUTPUT_ONLY fields of the stored resource into a
+// payload before a full replacement. dst and src must have the same message
+// type and must not be nil. If not, Copy panics.
 func Copy(dst, src proto.Message, behaviors ...annotations.FieldBehavior) {
 	copyMessage(dst.ProtoReflect(), src.ProtoReflect(), behaviors)
 }
 
+// copyMessage sets each field of dst that has one of behaviors to its value
+// in src, or clears it when src does not have it. It does the same in the
+// nested messages of the other fields.
 func copyMessage(dst, src protoreflect.Message, behaviors []annotations.FieldBehavior) {
 	fields := dst.Descriptor().Fields()
 	for i := range fields.Len() {

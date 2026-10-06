@@ -8,7 +8,7 @@ package resourcename
 // presentation form of the terminal empty label), so that the wire format
 // stays within its 255-octet limit.
 //
-// [Validate] applies it to each path segment and to the service host of a
+// [Validate] applies it to each path segment and to the service name of a
 // full resource name. Segments keep DNS case-insensitivity: uppercase
 // letters are accepted, as collection identifiers are lowerCamelCase per
 // AIP-122.

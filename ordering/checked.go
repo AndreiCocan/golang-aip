@@ -2,16 +2,15 @@ package ordering
 
 import "strings"
 
-// CheckedOrderBy is an order_by that [Check] validated against a [Schema]. It is
-// the contract consumed by dialect packages: every field path is declared
-// in the schema, exact duplicates are merged, and no field appears in two
-// directions. No fields means the order_by was empty and the service's
-// default order applies.
+// CheckedOrderBy is an order_by that [Check] validated against a [Schema].
+// Dialect packages read it: the schema declares each path, Check merged the
+// exact duplicates, and no path has two directions. No keys means that the
+// order_by was empty, and the default order of the service applies.
 type CheckedOrderBy struct {
 	Keys []Key
 }
 
-// Key is one validated ordering key: a field path and its direction.
+// Key is one validated sort key: a field path and its direction.
 type Key struct {
 	// Segments holds the dotted path split at the dots: "author.name"
 	// becomes {"author", "name"}.

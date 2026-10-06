@@ -39,11 +39,16 @@ func Parse(filter string) (*ast.Filter, error) {
 	return &ast.Filter{Source: filter, Expr: expr}, nil
 }
 
+// parser reads the tokens of a filter.
 type parser struct {
+	// filter is the complete filter, for the errors.
 	filter string
+	// tokens holds the tokens of the filter. The last token is EOF.
 	tokens []token
-	i      int
-	depth  int
+	// i is the index of the current token.
+	i int
+	// depth is the current nesting level. See [parser.push].
+	depth int
 }
 
 // peek returns the current token without consuming it.
@@ -69,10 +74,14 @@ func (p *parser) next() token {
 	return tok
 }
 
+// errorf returns a [*ParseError] at the byte offset pos, with a message
+// from format and args.
 func (p *parser) errorf(pos int, format string, args ...any) error {
 	return &ParseError{Filter: p.filter, Pos: pos, Message: fmt.Sprintf(format, args...)}
 }
 
+// isKeywordText reports whether s is the text of a keyword: AND, OR, or
+// NOT.
 func isKeywordText(s string) bool { return s == "AND" || s == "OR" || s == "NOT" }
 
 // atKeyword reports whether the current token is the bare keyword kw. A
@@ -465,6 +474,7 @@ func (p *parser) push(pos int) error {
 	return nil
 }
 
+// pop leaves the nesting level that [parser.push] entered.
 func (p *parser) pop() { p.depth-- }
 
 // valueOf converts a TEXT or STRING token to an [ast.Value].

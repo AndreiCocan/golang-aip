@@ -11,25 +11,32 @@ import (
 	"github.com/AndreiCocan/golang-aip/fieldbehavior"
 )
 
-// Update merges the masked fields of src, an update request's payload, into
-// dst, the stored resource. A masked field takes src's value; unpopulated
-// in src, it is cleared. Both messages must share one type; Update panics
-// otherwise. On error dst is left unmodified, and on success it shares no
-// data with src.
+// Update merges the masked fields of src into dst. src is the payload of an
+// update request, and dst is the stored resource. A masked field gets the
+// value that it has in src. When the field has no value in src, Update
+// clears it in dst.
 //
-// The mask's paths address fields of the resource, [CheckUpdate]-validated first.
-// A nil or empty mask means the implied mask of src's populated fields,
-// which updates without ever clearing. The "*" mask requests full
-// replacement: every field takes src's value, populated or not.
+// The paths of the mask name fields of the resource. Update validates the
+// mask with [CheckUpdate] first. A nil or empty mask means the implied mask
+// of the populated fields of src, so Update never clears a field. The "*"
+// mask requests a full replacement: each field gets the value that it has in
+// src, populated or not.
 //
-// Field behavior annotations bound what any mask can do. OUTPUT_ONLY
-// fields keep their stored value, at any depth, without erroring, no
-// matter how the mask or payload names them. IMMUTABLE and IDENTIFIER
-// fields accept their current value as a no-op but reject any change with
-// an error matching [ErrImmutable]; under a "*" mask, leaving them
-// unpopulated preserves them instead of clearing. Annotations inside
-// repeated fields and map entries are not enforced, since replaced
-// elements have no stored counterpart to compare against.
+// The field behavior annotations limit what a mask can do:
+//
+//   - An OUTPUT_ONLY field keeps its stored value, at any depth, and Update
+//     returns no error for it.
+//   - An IMMUTABLE or IDENTIFIER field accepts its current value. A different
+//     value gives an error that matches [ErrImmutable]. With the "*" mask, an
+//     unpopulated IMMUTABLE or IDENTIFIER field keeps its stored value.
+//   - Update does not enforce the annotations inside repeated fields and map
+//     values, because a replaced element has no stored element to compare
+//     with.
+//
+// dst and src must have the same message type. If not, Update panics. When
+// Update returns an error, dst does not change. After a successful Update,
+// dst shares no data with src. Update is not safe for concurrent use on the
+// same dst.
 func Update(mask *fieldmaskpb.FieldMask, dst, src proto.Message) error {
 	if dst.ProtoReflect().Descriptor() != src.ProtoReflect().Descriptor() {
 		panic("fieldmask: Update dst and src must share a message type")
@@ -56,7 +63,8 @@ func Update(mask *fieldmaskpb.FieldMask, dst, src proto.Message) error {
 		mergeTree(to, from, tree)
 	}
 
-	// The merge shares values with src; clone before the sweep mutates any.
+	// The merge shares values with src. Clone before enforceBehaviors
+	// changes them.
 	merged = proto.Clone(merged)
 	if err := enforceBehaviors(merged.ProtoReflect(), dst.ProtoReflect(), ""); err != nil {
 		return err
@@ -68,10 +76,10 @@ func Update(mask *fieldmaskpb.FieldMask, dst, src proto.Message) error {
 	return nil
 }
 
-// replaceAll gives every field of w the value it has in s, except that
-// output-only fields are never touched and immutable fields unpopulated in
-// s are preserved rather than cleared. Immutable fields populated in s are
-// written; the behavior sweep rejects them if that changed anything.
+// replaceAll gives each field of dst the value that it has in src. It does
+// not touch OUTPUT_ONLY fields. It keeps an IMMUTABLE or IDENTIFIER field
+// that has no value in src. It writes an IMMUTABLE or IDENTIFIER field that
+// has a value in src, and [enforceBehaviors] then rejects a changed value.
 func replaceAll(dst, src protoreflect.Message) {
 	fields := dst.Descriptor().Fields()
 	for i := range fields.Len() {
@@ -88,8 +96,8 @@ func replaceAll(dst, src protoreflect.Message) {
 	}
 }
 
-// setField gives fd in w the value it has in s: set when populated,
-// cleared when not.
+// setField gives fd in dst the value that it has in src. When fd has no
+// value in src, setField clears it in dst.
 func setField(dst, src protoreflect.Message, fd protoreflect.FieldDescriptor) {
 	if src.Has(fd) {
 		dst.Set(fd, src.Get(fd))
@@ -98,10 +106,11 @@ func setField(dst, src protoreflect.Message, fd protoreflect.FieldDescriptor) {
 	}
 }
 
-// mergeTree applies the masked paths of one message level.
+// mergeTree merges the fields of src that node covers into dst, for one
+// message level, and continues into the levels below.
 func mergeTree(dst, src protoreflect.Message, node *maskNode) {
 	for segment, child := range node.children {
-		// Check has passed: the field exists.
+		// The mask is valid, so the field exists.
 		fd := dst.Descriptor().Fields().ByName(protoreflect.Name(segment))
 		if child.terminal {
 			setField(dst, src, fd)
@@ -122,8 +131,8 @@ func mergeTree(dst, src protoreflect.Message, node *maskNode) {
 	}
 }
 
-// mergeMapKeys applies masked paths that address entries of a map field by
-// key.
+// mergeMapKeys merges the entries of the map field fd that node names by
+// key, from src into dst.
 func mergeMapKeys(dst, src protoreflect.Message, fd protoreflect.FieldDescriptor, node *maskNode) {
 	dstMap := dst.Mutable(fd).Map()
 	srcMap := src.Get(fd).Map()
@@ -140,7 +149,7 @@ func mergeMapKeys(dst, src protoreflect.Message, fd protoreflect.FieldDescriptor
 			continue
 		}
 
-		// Below a key the value is a message; Check has passed.
+		// The mask is valid, so the value below a key is a message.
 		if !dstMap.Has(mk) && !srcMap.Has(mk) {
 			continue
 		}
@@ -154,9 +163,11 @@ func mergeMapKeys(dst, src protoreflect.Message, fd protoreflect.FieldDescriptor
 	}
 }
 
-// enforceBehaviors enforces field behavior annotations after a merge: work
-// is the merged resource, orig the stored one. Output-only fields get
-// their stored values back, and a changed immutable field is an error.
+// enforceBehaviors applies the field behavior annotations after a merge.
+// merged is the result of the merge, and stored is the resource before the
+// update. An OUTPUT_ONLY field gets its stored value back. An IMMUTABLE or
+// IDENTIFIER field with a changed value gives an error that matches
+// [ErrImmutable]. prefix is the path of merged from the root, for the error.
 func enforceBehaviors(merged, stored protoreflect.Message, prefix string) error {
 	fields := merged.Descriptor().Fields()
 	for i := range fields.Len() {
@@ -171,8 +182,8 @@ func enforceBehaviors(merged, stored protoreflect.Message, prefix string) error 
 				return fmt.Errorf("%w: %s", ErrImmutable, path)
 			}
 		case fd.IsMap() || fd.IsList():
-			// Annotations inside map entries and repeated elements are
-			// not enforced: replaced elements have no stored counterpart.
+			// The annotations inside map values and repeated elements are
+			// not enforced: a replaced element has no stored element.
 		case fd.Kind() == protoreflect.MessageKind:
 			if !mayNeedEnforcement(merged, stored, fd) {
 				continue
@@ -188,9 +199,10 @@ func enforceBehaviors(merged, stored protoreflect.Message, prefix string) error 
 	return nil
 }
 
-// mayNeedEnforcement reports whether a message field can hold anything for
-// enforceBehaviors to enforce, avoiding the creation of empty messages in
-// work for subtrees without annotated values.
+// mayNeedEnforcement reports whether the message field fd can hold a value
+// that [enforceBehaviors] must enforce. It prevents enforceBehaviors from
+// making empty messages in merged for subtrees that have no annotated
+// values.
 func mayNeedEnforcement(merged, stored protoreflect.Message, fd protoreflect.FieldDescriptor) bool {
 	if merged.Has(fd) {
 		return true
@@ -199,10 +211,9 @@ func mayNeedEnforcement(merged, stored protoreflect.Message, fd protoreflect.Fie
 	return stored.Has(fd) && hasAnnotatedValue(stored.Get(fd).Message())
 }
 
-// hasAnnotatedValue reports whether the message holds, at any depth, a
-// populated field carrying one of the annotations the update sweep
-// enforces: OUTPUT_ONLY, IMMUTABLE, or IDENTIFIER. Populated fields without
-// them give the sweep nothing to do.
+// hasAnnotatedValue reports whether the message has, at any depth, a
+// populated field with an annotation that [enforceBehaviors] enforces:
+// OUTPUT_ONLY, IMMUTABLE, or IDENTIFIER.
 func hasAnnotatedValue(m protoreflect.Message) bool {
 	found := false
 
@@ -225,20 +236,21 @@ func hasAnnotatedValue(m protoreflect.Message) bool {
 	return found
 }
 
-// isOutputOnly reports whether the field is server-managed output.
+// isOutputOnly reports whether the field has the OUTPUT_ONLY annotation:
+// the server sets it, and a client cannot.
 func isOutputOnly(fd protoreflect.FieldDescriptor) bool {
 	return fieldbehavior.Has(fd, annotations.FieldBehavior_OUTPUT_ONLY)
 }
 
-// rejectsChange reports whether the field rejects changes after creation,
-// which covers both the IMMUTABLE and IDENTIFIER annotations.
+// rejectsChange reports whether a client cannot change the field after
+// creation: the field has the IMMUTABLE or the IDENTIFIER annotation.
 func rejectsChange(fd protoreflect.FieldDescriptor) bool {
 	return fieldbehavior.Has(fd, annotations.FieldBehavior_IMMUTABLE) ||
 		fieldbehavior.Has(fd, annotations.FieldBehavior_IDENTIFIER)
 }
 
-// joinPath joins a parent path and a segment with a dot, omitting the dot
-// for a root segment.
+// joinPath joins a parent path and a segment with a dot. When prefix is
+// empty, it returns segment.
 func joinPath(prefix, segment string) string {
 	if prefix == "" {
 		return segment

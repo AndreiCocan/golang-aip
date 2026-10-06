@@ -10,9 +10,10 @@ import (
 )
 
 // An update handler. Normalize the mask, in case a REST client wrote the
-// JSON names of the fields. Check it before the database read, to fail
-// fast on a bad path. Then merge the masked fields of the payload into the
-// stored resource, and store the result. Errors are INVALID_ARGUMENT.
+// JSON names of the fields. Validate it with CheckUpdate before the
+// database read, to fail fast on a bad path. Then merge the masked fields
+// of the payload into the stored resource, and store the result. Errors
+// are INVALID_ARGUMENT.
 func Example() {
 	mask := &fieldmaskpb.FieldMask{Paths: []string{"title", "pageCount"}}
 	payload := &testproto.Book{Title: "The Go Programming Language, 2nd Edition", PageCount: 400}

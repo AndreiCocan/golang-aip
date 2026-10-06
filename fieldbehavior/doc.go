@@ -3,38 +3,28 @@
 // INPUT_ONLY, IMMUTABLE, and IDENTIFIER designations that protos attach to
 // fields.
 //
-// [Get] and [Has] look behaviors up on a field descriptor. The remaining
-// functions enforce the behaviors a service must uphold at runtime:
+// [Get] and [Has] read the behaviors of a field descriptor. The other
+// functions apply the behaviors at run time:
 //
-//   - [Clear] drops annotated fields from a message. Clearing OUTPUT_ONLY
-//     (plus IDENTIFIER on create) from a request payload discards
-//     server-managed fields without erroring, as required of services.
+//   - [Clear] removes the fields with given behaviors from a message. For
+//     example, clear OUTPUT_ONLY, and IDENTIFIER on create, from a request
+//     payload. Then the fields that the server manages go away without an
+//     error.
+//   - [Copy] copies the fields with given behaviors from one message to
+//     another. For example, put back the OUTPUT_ONLY fields of the stored
+//     resource after a full replacement.
+//   - [ValidateRequired] checks the required fields of a create request.
+//     [ValidateRequiredWithMask] checks those of an update, where a
+//     required field can be absent when the field mask does not cover it.
 //
-//   - [Copy] carries annotated fields from one message to another, for
-//     example restoring OUTPUT_ONLY fields from the stored resource after
-//     a full replacement.
+// A validation error matches [ErrMissingRequired] with [errors.Is], and
+// names each missing field. Such an error is bad client input. The error
+// is a [*RequiredFieldsError] with the paths of all the missing fields.
 //
-//   - [ValidateRequired] checks a create request's required fields;
-//     [ValidateRequiredWithMask] checks an update's, where a required
-//     field may be omitted as long as the field mask does not cover it.
+// [Copy], [ValidateRequired], and [ValidateRequiredWithMask] need a
+// descriptor, so they panic on a nil message. Only [Clear] accepts a nil
+// message, because it has no fields to clear.
 //
-//     if err := fieldbehavior.ValidateRequired(req); err != nil { … }
-//     fieldbehavior.Clear(req.GetBook(),
-//     annotations.FieldBehavior_OUTPUT_ONLY,
-//     annotations.FieldBehavior_IDENTIFIER,
-//     )
-//
-// Validation errors match [ErrMissingRequired] with [errors.Is] and name
-// every missing field; services should surface them as an INVALID_ARGUMENT
-// response. The error is a [*RequiredFieldsError] with the paths of all the
-// missing fields, for example to build one field violation per field.
-//
-// A nil message is a programming error everywhere a descriptor is needed to
-// do the work: [Copy], [ValidateRequired], and [ValidateRequiredWithMask]
-// panic on one. Only [Clear] accepts it, since a message with no fields has
-// nothing to clear.
-//
-// Field mask handling itself, including how IMMUTABLE is enforced during
-// an update, lives in the fieldmask package; this package is the annotation
-// layer under it.
+// The fieldmask package uses this package to enforce the annotations
+// during an update.
 package fieldbehavior

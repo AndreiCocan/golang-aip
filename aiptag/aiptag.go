@@ -17,11 +17,14 @@ var ErrInvalidTag = errors.New("invalid aip tag")
 type Tag struct {
 	// Name is the API name of the field, such as "display_name".
 	Name string
-	// Filterable tells that a filter can name the field.
+	// Filterable reports whether a filter can name the field: the tag has
+	// the filter option.
 	Filterable bool
-	// Orderable tells that an order_by can name the field.
+	// Orderable reports whether an order_by can name the field: the tag has
+	// the order option.
 	Orderable bool
-	// Searchable tells that a bare search term matches the field.
+	// Searchable reports whether a bare search term of a filter matches the
+	// field: the tag has the search option.
 	Searchable bool
 }
 
