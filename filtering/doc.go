@@ -6,9 +6,11 @@
 //
 //   - This package turns a filter string into a checked, fully typed
 //     expression tree.
-//   - Separate dialect packages translate that tree into a storage backend's query language. The checked tree
-//     is the contract between the two layers; anyone can implement a
-//     dialect for another backend against it.
+//   - Separate dialect packages, such as the filtering package of
+//     github.com/AndreiCocan/golang-aip-postgres, translate that tree
+//     into a storage backend's query language. The checked tree is the
+//     contract between the two layers; anyone can implement a dialect
+//     for another backend against it.
 //
 // The pipeline is [Parse] (string to syntactic tree), then [Check]
 // (syntactic tree to typed tree, validated against a [Schema]); [Compile]
@@ -71,5 +73,6 @@
 // interface to implement: expose whatever entry point suits the backend
 // and type-switch over the five node kinds. Reject what the backend cannot
 // express (commonly [Search], [FuncCall], and has restrictions on
-// repeated fields) with clear errors rather than approximating.
+// repeated fields) with clear errors rather than approximating. See
+// github.com/AndreiCocan/golang-aip-postgres for a PostgreSQL dialect.
 package filtering

@@ -733,17 +733,20 @@ func (c *checker) timestampLiteral(lit literal) (Value, error) {
 }
 
 // durationLiteral parses a seconds duration literal such as 20s or 1.5s.
+// It rejects a duration that [time.Duration] cannot hold, about 292 years.
 func (c *checker) durationLiteral(lit literal) (Value, error) {
 	if num, ok := strings.CutSuffix(lit.text, "s"); ok {
 		secs, err := strconv.ParseFloat(num, 64)
-		if err == nil && !math.IsInf(secs, 0) && !math.IsNaN(secs) {
-			return DurationValue(time.Duration(secs * float64(time.Second))), nil
+		// The comparison is false for NaN, and float64(math.MaxInt64) is
+		// 2^63, the first value out of range.
+		if ns := secs * float64(time.Second); err == nil && math.Abs(ns) < math.MaxInt64 {
+			return DurationValue(time.Duration(ns)), nil
 		}
 	}
 
 	return Value{}, c.errorf(
 		lit.pos,
-		"invalid duration %q; use seconds with an s suffix, like 20s or 1.5s",
+		"invalid duration %q; use seconds with an s suffix, like 20s or 1.5s, up to 292 years",
 		lit.text,
 	)
 }

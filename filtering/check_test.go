@@ -512,6 +512,8 @@ func TestCheck(t *testing.T) {
 			{name: "message compared to string", filter: `author = "x"`, wantPos: 9},
 			{name: "map compared without key", filter: "labels = x", wantPos: 7},
 			{name: "duration without suffix", filter: "read_time > 300", wantPos: 12},
+			{name: "duration too long", filter: "read_time > 9999999999s", wantPos: 12},
+			{name: "negative duration too long", filter: "read_time > -9999999999s", wantPos: 12},
 			{name: "invalid timestamp", filter: `create_time > "not-a-time"`, wantPos: 14},
 			{name: "date-only timestamp", filter: "create_time >= 2021-02-14", wantPos: 15},
 			{name: "unknown function", filter: "nope()", wantPos: 0},

@@ -5,9 +5,11 @@
 //
 //   - This package turns an order_by string into a checked list of
 //     ordering keys.
-//   - Separate dialect packages translate that list into a storage backend's query language. The checked
-//     order_by is the contract between the two layers; anyone can
-//     implement a dialect for another backend against it.
+//   - Separate dialect packages, such as the ordering package of
+//     github.com/AndreiCocan/golang-aip-postgres, translate that list
+//     into a storage backend's query language. The checked order_by is
+//     the contract between the two layers; anyone can implement a
+//     dialect for another backend against it.
 //
 // The pipeline is [Parse] (string to syntactic tree), then [Check]
 // (syntactic tree to validated keys, resolved against a [Schema]);
