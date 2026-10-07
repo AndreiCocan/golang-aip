@@ -7,6 +7,8 @@
 //   - [Update] merges the masked fields of a request payload into the
 //     stored resource.
 //   - [Prune] removes from a response the fields that are not in the mask.
+//   - [MarshalJSON] writes the JSON of the fields that a read mask covers,
+//     with the default values of the covered fields.
 //   - [CheckUpdate] and [CheckRead] validate the paths of an update mask
 //     and of a read mask. Call them before you read the resource, to fail
 //     early.

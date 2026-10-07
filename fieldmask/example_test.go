@@ -112,3 +112,23 @@ func ExamplePrune() {
 	fmt.Printf("%q %q %d\n", book.GetTitle(), book.GetAuthor().GetName(), book.GetAuthor().GetAge())
 	// Output: "The Go Programming Language" "Alan Donovan" 0
 }
+
+// The JSON has the fields that the read mask names, also those that have
+// their default value, such as the zero page count.
+func ExampleMarshalJSON() {
+	book := &testproto.Book{
+		Name:  "shelves/1/books/1",
+		Title: "The Go Programming Language",
+	}
+	mask := &fieldmaskpb.FieldMask{Paths: []string{"title", "page_count"}}
+
+	data, err := fieldmask.MarshalJSON(mask, book)
+	if err != nil {
+		fmt.Println(err)
+
+		return
+	}
+
+	fmt.Println(string(data))
+	// Output: {"title":"The Go Programming Language","pageCount":0}
+}
