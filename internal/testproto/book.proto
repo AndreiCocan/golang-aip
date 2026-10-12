@@ -8,8 +8,8 @@ option go_package = "github.com/AndreiCocan/golang-aip/internal/testproto";
 
 // Book is the test resource for the fieldbehavior and fieldmask packages.
 // Its fields cover every field behavior and shape the packages care about:
-// identifier, required, output-only, input-only, immutable, nested message,
-// map, and repeated fields.
+// identifier, required, output-only, input-only, immutable scalar and
+// message, nested message, map, and repeated fields.
 message Book {
   // The resource name of the book.
   string name = 1 [(google.api.field_behavior) = IDENTIFIER];
@@ -46,6 +46,15 @@ message Book {
 
   // Reviews shown on the book's landing page.
   repeated Review featured_reviews = 12 [(google.api.field_behavior) = OPTIONAL];
+
+  // The binding chosen when the book is first registered.
+  Binding binding = 13 [(google.api.field_behavior) = IMMUTABLE];
+}
+
+// Binding of a book. An empty binding is a paperback.
+message Binding {
+  // Whether the book has a hard cover.
+  bool hardcover = 1 [(google.api.field_behavior) = OPTIONAL];
 }
 
 // Author of a book.

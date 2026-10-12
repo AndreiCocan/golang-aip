@@ -27,8 +27,10 @@ import (
 //   - An OUTPUT_ONLY field keeps its stored value, at any depth, and Update
 //     returns no error for it.
 //   - An IMMUTABLE or IDENTIFIER field accepts its current value. A different
-//     value gives an error that matches [ErrImmutable]. With the "*" mask, an
-//     unpopulated IMMUTABLE or IDENTIFIER field keeps its stored value.
+//     value gives an error that matches [ErrImmutable]. To set or clear a
+//     message field is a change, also when the message has no populated
+//     fields. With the "*" mask, an unpopulated IMMUTABLE or IDENTIFIER field
+//     keeps its stored value.
 //   - Update does not enforce the annotations inside repeated fields and map
 //     values, because a replaced element has no stored element to compare
 //     with.
@@ -178,7 +180,9 @@ func enforceBehaviors(merged, stored protoreflect.Message, prefix string) error 
 		case isOutputOnly(fd):
 			setField(merged, stored, fd)
 		case rejectsChange(fd):
-			if !merged.Get(fd).Equal(stored.Get(fd)) {
+			// Equal does not compare presence: an unset message equals a set
+			// message with no populated fields.
+			if merged.Has(fd) != stored.Has(fd) || !merged.Get(fd).Equal(stored.Get(fd)) {
 				return fmt.Errorf("%w: %s", ErrImmutable, path)
 			}
 		case fd.IsMap() || fd.IsList():

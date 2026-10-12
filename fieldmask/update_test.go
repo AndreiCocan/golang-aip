@@ -350,3 +350,85 @@ func TestUpdate(t *testing.T) {
 		}
 	})
 }
+
+// An empty message has no populated fields, so only its presence tells a
+// set immutable message from an unset one.
+func TestUpdateEmptyImmutableMessage(t *testing.T) {
+	t.Parallel()
+
+	paperback := func() *testproto.Book {
+		return &testproto.Book{Title: "Old Title", Binding: &testproto.Binding{}}
+	}
+
+	tests := []struct {
+		name    string
+		paths   []string
+		stored  *testproto.Book
+		src     *testproto.Book
+		want    *testproto.Book // ignored when wantErr is set
+		wantErr error
+	}{
+		{
+			name:    "clearing the stored message is rejected",
+			paths:   []string{"binding"},
+			stored:  paperback(),
+			src:     &testproto.Book{},
+			wantErr: fieldmask.ErrImmutable,
+		},
+		{
+			name:    "setting an unset message is rejected",
+			paths:   []string{"binding"},
+			stored:  &testproto.Book{Title: "Old Title"},
+			src:     &testproto.Book{Binding: &testproto.Binding{}},
+			wantErr: fieldmask.ErrImmutable,
+		},
+		{
+			name:   "sending the current message is a no-op",
+			paths:  []string{"binding", "title"},
+			stored: paperback(),
+			src:    &testproto.Book{Title: "New Title", Binding: &testproto.Binding{}},
+			want:   &testproto.Book{Title: "New Title", Binding: &testproto.Binding{}},
+		},
+		{
+			name:   "wildcard keeps the message absent from the payload",
+			paths:  []string{"*"},
+			stored: paperback(),
+			src:    &testproto.Book{Title: "New Title"},
+			want:   &testproto.Book{Title: "New Title", Binding: &testproto.Binding{}},
+		},
+		{
+			name:   "implied mask keeps the message absent from the payload",
+			stored: paperback(),
+			src:    &testproto.Book{Title: "New Title"},
+			want:   &testproto.Book{Title: "New Title", Binding: &testproto.Binding{}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			before := proto.Clone(tt.stored)
+
+			err := fieldmask.Update(&fieldmaskpb.FieldMask{Paths: tt.paths}, tt.stored, tt.src)
+			if tt.wantErr != nil {
+				if !errors.Is(err, tt.wantErr) {
+					t.Fatalf("Update() = %v, want %v", err, tt.wantErr)
+				}
+
+				if diff := cmp.Diff(before, tt.stored, protocmp.Transform()); diff != "" {
+					t.Fatalf("Update() modified dst on error (-want +got):\n%s", diff)
+				}
+
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("Update() = %v, want nil", err)
+			}
+
+			if diff := cmp.Diff(tt.want, tt.stored, protocmp.Transform()); diff != "" {
+				t.Fatalf("Update() mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
